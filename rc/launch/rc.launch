@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+    <include file="$(find rosserial_server)/launch/socket.launch"/>
+    <node name="gyro" pkg="rc" type="gyro.py"/>
+    <node name="omni" pkg="rc" type="omni.py"/>
+    <node name="watchdog" pkg="rc" type="watchdog.py"/>
+</launch>
