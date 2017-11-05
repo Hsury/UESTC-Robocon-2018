@@ -28,7 +28,7 @@ def loop():
 def initSerial():
     global com
     try:
-        com = serial.Serial('/dev/ttyUSB3', 115200)
+        com = serial.Serial('/dev/ttyUSB3', 921600)
         rospy.loginfo('Gyroscope initialized')
     except:
         rospy.logerr('Gyroscope NOT initialized')
