@@ -32,7 +32,7 @@ def setup():
 
 def loop():
     global vector3, goal, pub
-    rate = rospy.Rate(1000)
+    rate = rospy.Rate(100)
     while not rospy.is_shutdown():
         vector3.x = goal[0]
         vector3.y = goal[1]
