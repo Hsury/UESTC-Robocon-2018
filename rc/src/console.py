@@ -13,9 +13,9 @@ from PyQt5.QtCore import *
 MAP_SIZE = 800
 ARROW_SIZE = 15
 
-cursor = [7, 7, 0]
-goal = [7, 7, 0]
-robot = [7, 7, 0]
+cursor = [0] * 3
+goal = [0] * 3
+robot = [0] * 3
 speed = [0] * 3
 stateMachine = 0
 vector3 = Vector3()
@@ -31,8 +31,13 @@ def setup():
     thd.start()
 
 def loop():
+    global vector3, pub
     rate = rospy.Rate(1000)
     while not rospy.is_shutdown():
+        vector3.x = goal[0]
+        vector3.y = goal[1]
+        vector3.z = goal[2]
+        pub.publish(vector3)
         rate.sleep()
 
 def velCB(data):
@@ -92,7 +97,7 @@ class MainWindow(QWidget):
         self.update()
     
     def mousePressEvent(self, event):
-        global stateMachine, ratioX, ratioY, cursor, goal, robot, vector3, pub
+        global stateMachine, ratioX, ratioY, cursor, goal
         if stateMachine == 0:
             if event.button() == Qt.LeftButton:
                 cursor[0] = ratioX * event.pos().x()
@@ -103,16 +108,12 @@ class MainWindow(QWidget):
                 goal[0] = cursor[0]
                 goal[1] = cursor[1]
                 goal[2] = cursor[2]
-                vector3.x = goal[0]
-                vector3.y = goal[1]
-                vector3.z = goal[2]
-                pub.publish(vector3)
             stateMachine = 0
         self.update()
     
     def drawMap(self):
         mapPainter = QPainter(self)
-        pixmap = QPixmap("map.png")
+        pixmap = QPixmap("../map.png")
         mapPainter.drawPixmap(self.rect(), pixmap)
     
     def drawRobot(self, point, color):

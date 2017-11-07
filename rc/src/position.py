@@ -25,8 +25,8 @@ def loop():
 
 def merge():
     global vector3, gyroData
-    vector3.x = gyroData[0] + 7
-    vector3.y = gyroData[1] + 7
+    vector3.x = gyroData[0]
+    vector3.y = gyroData[1]
     vector3.z = gyroData[2]
 
 def gyroCB(data):
