@@ -35,10 +35,10 @@ def loop():
     global lock, vector3, goal, pub
     rate = rospy.Rate(100)
     while not rospy.is_shutdown():
+        vector3.x = goal[0]
+        vector3.y = goal[1]
+        vector3.z = goal[2]
         if (lock == False):
-            vector3.x = goal[0]
-            vector3.y = goal[1]
-            vector3.z = goal[2]
             pub.publish(vector3)
         rate.sleep()
 

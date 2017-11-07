@@ -8,6 +8,8 @@ from geometry_msgs.msg import Vector3
 position = [0] * 3
 goal = [0] * 3
 dist = [0] * 3
+lock1 = True
+lock2 = True
 vector3 = Vector3()
 
 def setup():
@@ -18,14 +20,15 @@ def setup():
     pub = rospy.Publisher('vel', Vector3, queue_size = 1)
 
 def loop():
-    global vector3, dist, pub
+    global lock1, lock2, vector3, dist, pub
     rate = rospy.Rate(100)
     while not rospy.is_shutdown():
         plan()
         vector3.x = min(dist[0] / 2, 1)
         vector3.y = min(dist[1] / 2, 1)
         vector3.z = min(dist[2] / 2, math.pi / 2)
-        pub.publish(vector3)
+        if (lock1 == False and lock2 == False):
+            pub.publish(vector3)
         rate.sleep()
 
 def plan():
@@ -39,16 +42,18 @@ def plan():
         dist[2] -= 2 * math.pi
 
 def positionCB(data):
-    global position
+    global lock1, position
     position[0] = data.x
     position[1] = data.y
     position[2] = data.z
+    lock1 = False
 
 def goalCB(data):
-    global goal
+    global lock2, goal
     goal[0] = data.x
     goal[1] = data.y
     goal[2] = data.z
+    lock2 = False
 
 if __name__ == '__main__':
     try:
