@@ -1,5 +1,8 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
+from __future__ import division
 import rospy
+import math
 import threading
 from evdev import InputDevice, categorize, ecodes
 from geometry_msgs.msg import Vector3

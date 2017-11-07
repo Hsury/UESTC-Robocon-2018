@@ -1,7 +1,8 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
+from __future__ import division
 import rospy
 import serial
-import tf
 import math
 from geometry_msgs.msg import Vector3
 
@@ -10,7 +11,7 @@ SIDE_LENGTH = 1.01
 REDUCTION_RATIO = 19
 
 com = []
-vel = [0, 0, 0, 0]
+vel = [0] * 4
 gyro = 0.0
 
 def setup():

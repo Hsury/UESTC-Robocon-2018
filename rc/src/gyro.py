@@ -1,11 +1,12 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
+from __future__ import division
 import rospy
 import serial
-import tf
 import math
 from geometry_msgs.msg import Vector3
 
-gyro = 0.0
+gyro = [0] * 3
 vector3 = Vector3()
 
 def setup():
@@ -19,9 +20,11 @@ def loop():
     rate = rospy.Rate(1000)
     while not rospy.is_shutdown():
         getGyro()
-        vector3.z = gyro
+        vector3.x = gyro[0]
+        vector3.y = gyro[1]
+        vector3.z = gyro[2]
         pub.publish(vector3)
-        gyroInfo = "Gyro = %f" % gyro
+        gyroInfo = "X = %f, Y = %f, Z = %f" % (gyro[0], gyro[1], gyro[2])
         rospy.loginfo(gyroInfo)
         rate.sleep()
 
@@ -39,7 +42,15 @@ def getGyro():
         com.flushInput()
         while (com.read(1) != '\n'):
             pass
-        gyro = float(com.read(8)) * math.pi / 180
+        buffer = ''
+        while True:
+            buffer += com.read(1)
+            if (buffer[-1] == '\r'):
+                buffer = buffer[:-1].split(' ')
+                break
+        gyro[0] = int(buffer[1]) / 1E4
+        gyro[1] = int(buffer[2]) / 1E4
+        gyro[2] = float(buffer[0]) * math.pi / 180
     except:
         pass
 
