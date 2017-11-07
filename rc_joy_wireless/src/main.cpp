@@ -85,7 +85,7 @@ void loop() {
     vector3.x = x;
     vector3.y = y;
     vector3.z = z * PI / 180;;
-    if (nh.connected()) pub.publish(&vector3);
+    if (nh.connected() and (x or y or z)) pub.publish(&vector3);
     nh.spinOnce();
 }
 

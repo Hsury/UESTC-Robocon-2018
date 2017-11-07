@@ -22,9 +22,9 @@ def loop():
     rate = rospy.Rate(100)
     while not rospy.is_shutdown():
         plan()
-        vector3.x = dist[0] / 5
-        vector3.y = dist[1] / 5
-        vector3.z = dist[2] / 5
+        vector3.x = min(dist[0] / 2, 1)
+        vector3.y = min(dist[1] / 2, 1)
+        vector3.z = min(dist[2] / 2, math.pi / 2)
         pub.publish(vector3)
         rate.sleep()
 

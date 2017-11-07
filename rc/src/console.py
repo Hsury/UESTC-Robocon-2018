@@ -17,6 +17,7 @@ cursor = [0] * 3
 goal = [0] * 3
 robot = [0] * 3
 speed = [0] * 3
+lock = True
 stateMachine = 0
 vector3 = Vector3()
 
@@ -31,13 +32,14 @@ def setup():
     thd.start()
 
 def loop():
-    global vector3, goal, pub
+    global lock, vector3, goal, pub
     rate = rospy.Rate(100)
     while not rospy.is_shutdown():
-        vector3.x = goal[0]
-        vector3.y = goal[1]
-        vector3.z = goal[2]
-        pub.publish(vector3)
+        if (lock == False):
+            vector3.x = goal[0]
+            vector3.y = goal[1]
+            vector3.z = goal[2]
+            pub.publish(vector3)
         rate.sleep()
 
 def velCB(data):
@@ -97,7 +99,7 @@ class MainWindow(QWidget):
         self.update()
     
     def mousePressEvent(self, event):
-        global stateMachine, ratioX, ratioY, cursor, goal
+        global lock, stateMachine, ratioX, ratioY, cursor, goal
         if stateMachine == 0:
             if event.button() == Qt.LeftButton:
                 cursor[0] = ratioX * event.pos().x()
@@ -108,8 +110,12 @@ class MainWindow(QWidget):
                 goal[0] = cursor[0]
                 goal[1] = cursor[1]
                 goal[2] = cursor[2]
+                lock = False
             stateMachine = 0
         self.update()
+    
+    def closeEvent(self, event):
+        rospy.signal_shutdown('GUI closed')
     
     def drawMap(self):
         mapPainter = QPainter(self)

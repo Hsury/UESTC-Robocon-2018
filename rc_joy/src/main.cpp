@@ -35,6 +35,6 @@ void loop() {
     vector3.x = x;
     vector3.y = y;
     vector3.z = z * PI / 180;
-    pub.publish(&vector3);
+    if (x or y or z) pub.publish(&vector3);
     nh.spinOnce();
 }
