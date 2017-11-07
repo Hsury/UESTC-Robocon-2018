@@ -31,7 +31,7 @@ def setup():
     thd.start()
 
 def loop():
-    global vector3, pub
+    global vector3, goal, pub
     rate = rospy.Rate(1000)
     while not rospy.is_shutdown():
         vector3.x = goal[0]

@@ -19,12 +19,12 @@ def setup():
 
 def loop():
     global vector3, dist, pub
-    rate = rospy.Rate(1000)
+    rate = rospy.Rate(500)
     while not rospy.is_shutdown():
         plan()
-        vector3.x = dist[0] / 20
-        vector3.y = dist[1] / 20
-        vector3.z = dist[2] / 20
+        vector3.x = dist[0] / 5
+        vector3.y = dist[1] / 5
+        vector3.z = dist[2] / 5
         pub.publish(vector3)
         rate.sleep()
 
