@@ -4,7 +4,6 @@
     <node name="console" pkg="rc" type="console.py"/>
     <node name="goto" pkg="rc" type="goto.py"/>
     <node name="gyro" pkg="rc" type="gyro.py"/>
-    <node name="mouse" pkg="rc" type="mouse.py"/>
     <node name="omni" pkg="rc" type="omni.py"/>
     <node name="position" pkg="rc" type="position.py"/>
     <node name="watchdog" pkg="rc" type="watchdog.py"/>

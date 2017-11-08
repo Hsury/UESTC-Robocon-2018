@@ -53,6 +53,10 @@ def positionCB(data):
     robot[0] = data.x
     robot[1] = data.y
     robot[2] = data.z
+    if lock:
+        goal[0] = robot[0]
+        goal[1] = robot[1]
+        goal[2] = robot[2]
 
 def windowShow():
     app = QApplication(sys.argv)
@@ -95,7 +99,7 @@ class MainWindow(QWidget):
                 if ratioY * (self.height() - event.pos().y()) > cursor[1]:
                     cursor[2] = 0
                 elif ratioY * (self.height() - event.pos().y()) < cursor[1]:
-                    cursor[2] = 180
+                    cursor[2] = math.pi
         self.update()
     
     def mousePressEvent(self, event):
