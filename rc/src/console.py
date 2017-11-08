@@ -3,6 +3,7 @@
 from __future__ import division
 import sys
 import rospy
+import rospkg
 import math
 import threading
 from geometry_msgs.msg import Vector3
@@ -22,10 +23,11 @@ stateMachine = 0
 vector3 = Vector3()
 
 def setup():
-    global pub
+    global rospack, pub
     rospy.init_node('console', anonymous = True)
     rospy.Subscriber("vel", Vector3, velCB)
     rospy.Subscriber("position", Vector3, positionCB)
+    rospack = rospkg.RosPack()
     pub = rospy.Publisher('goal', Vector3, queue_size = 1)
     thd = threading.Thread(target = windowShow)
     thd.setDaemon(True)
@@ -122,8 +124,9 @@ class MainWindow(QWidget):
         rospy.signal_shutdown('GUI closed')
     
     def drawMap(self):
+        global rospack
         mapPainter = QPainter(self)
-        pixmap = QPixmap("../map.png")
+        pixmap = QPixmap(rospack.get_path('rc') + "/map.png")
         mapPainter.drawPixmap(self.rect(), pixmap)
     
     def drawRobot(self, point, color):
