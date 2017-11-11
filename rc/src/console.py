@@ -6,6 +6,7 @@ import rospy
 import rospkg
 import math
 import threading
+import numpy as np
 from geometry_msgs.msg import Vector3
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -13,11 +14,10 @@ from PyQt5.QtCore import *
 
 MAP_SIZE = 800
 ARROW_SIZE = 15
+MARGIN = [1.5, 0.5]
 
-cursor = [0] * 3
-goal = [0] * 3
-robot = [0] * 3
-speed = [0] * 3
+schePts = np.zeros((1, 3))
+realPts = np.zeros((1, 3))
 lock = True
 stateMachine = 0
 vector3 = Vector3()
