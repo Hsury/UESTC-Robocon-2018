@@ -41,9 +41,9 @@ def merge():
 
 def swiftCB(data):
     global vector3, offset
-    offset[0] = data.x - vector3.x
-    offset[1] = data.y - vector3.y
-    offset[2] = data.z - vector3.z
+    offset[0] += data.x - vector3.x
+    offset[1] += data.y - vector3.y
+    offset[2] += data.z - vector3.z
 
 def gyroCB(data):
     global lock, gyroData

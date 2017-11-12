@@ -44,7 +44,7 @@ def loop():
 def readPath():
     global PARENT_PATH, goalX, goalY, goalZ
     try:
-        fobj = open(PARENT_PATH + '/bezier.txt', 'r')
+        fobj = open(PARENT_PATH + '/rc_bezier.txt', 'r')
         for eachline in fobj:
             buffer = eachline.encode('utf-8').split(' ')
             goalX.append(float(buffer[0]))

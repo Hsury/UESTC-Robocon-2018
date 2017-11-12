@@ -56,6 +56,8 @@ def getDist():
         dist[1] = 0
     if math.fabs(dist[2]) <= Z_PRECISION:
         dist[2] = 0
+    if math.sqrt(dist[0] ** 2 + dist[1] ** 2) <= XY_PRECISION and math.fabs(dist[2]) <= Z_PRECISION:
+        lock2 = True
 
 def positionCB(data):
     global lock1, position
