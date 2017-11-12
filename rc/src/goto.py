@@ -5,6 +5,7 @@ import rospy
 import math
 from geometry_msgs.msg import Vector3
 
+LOCK_WHEN_ARRIVED = True
 XY_PRECISION = 0.02
 Z_PRECISION = 1 / 180 * math.pi
 
@@ -27,8 +28,8 @@ def loop():
     rate = rospy.Rate(100)
     while not rospy.is_shutdown():
         getDist()
-        vector3.x = limiter(dist[0], -1, 1)
-        vector3.y = limiter(dist[1], -1, 1)
+        vector3.x = limiter(dist[0], -2, 2)
+        vector3.y = limiter(dist[1], -2, 2)
         vector3.z = limiter(dist[2], - math.pi / 2, math.pi / 2)
         if (lock1 == False and lock2 == False):
             pub.publish(vector3)
@@ -56,7 +57,7 @@ def getDist():
         dist[1] = 0
     if math.fabs(dist[2]) <= Z_PRECISION:
         dist[2] = 0
-    if math.sqrt(dist[0] ** 2 + dist[1] ** 2) <= XY_PRECISION and math.fabs(dist[2]) <= Z_PRECISION:
+    if LOCK_WHEN_ARRIVED and math.sqrt(dist[0] ** 2 + dist[1] ** 2) <= XY_PRECISION and math.fabs(dist[2]) <= Z_PRECISION:
         lock2 = True
 
 def positionCB(data):

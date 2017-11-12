@@ -18,14 +18,14 @@ MARGIN = [1.5, 0.5]
 PTS_NUM = 100
 DEGREE = 2
 
-origPts = np.zeros((1, 3))
+keyPts = np.zeros((1, 3))
 bezierPts = np.zeros((PTS_NUM, 3))
-idx = 0
-simidx = -1
+keyIdx = 0
+bezierIdx = -1
 stateMachine = 0
 
 def readPts():
-    global PARENT_PATH, DEGREE, idx, origPts
+    global PARENT_PATH, DEGREE, keyIdx, keyPts
     try:
         fobj = open(PARENT_PATH + '/rc_pts.txt', 'r')
         for eachline in fobj:
@@ -33,27 +33,27 @@ def readPts():
             if buffer[0] == 'DEGREE':
                 DEGREE = int(buffer[1])
             else:
-                origPts[idx][0] = buffer[0]
-                origPts[idx][1] = buffer[1]
-                origPts[idx][2] = buffer[2]
-                origPts = np.concatenate((origPts, np.array([origPts[idx]])))
-                idx += 1
+                keyPts[keyIdx][0] = buffer[0]
+                keyPts[keyIdx][1] = buffer[1]
+                keyPts[keyIdx][2] = buffer[2]
+                keyPts = np.concatenate((keyPts, np.array([keyPts[keyIdx]])))
+                keyIdx += 1
         fobj.close()
     except:
         pass
     calcBezier()
 
 def writePts():
-    global PARENT_PATH, DEGREE, idx, origPts, bezierPts
+    global PARENT_PATH, DEGREE, keyIdx, keyPts, bezierPts
     calcBezier()
     fobj = open(PARENT_PATH + '/rc_bezier.txt', 'w')
-    for i in range(PTS_NUM * int((idx - 1) / DEGREE)):
+    for i in range(PTS_NUM * int((keyIdx - 1) / DEGREE)):
         fobj.writelines('%f %f %f\n' % (bezierPts[i][0], bezierPts[i][1], bezierPts[i][2]))
     fobj.close()
     fobj = open(PARENT_PATH + '/rc_pts.txt', 'w')
     fobj.writelines('DEGREE %d\n' % DEGREE)
-    for i in range(idx):
-        fobj.writelines('%f %f %f\n' % (origPts[i][0], origPts[i][1], origPts[i][2]))
+    for i in range(keyIdx):
+        fobj.writelines('%f %f %f\n' % (keyPts[i][0], keyPts[i][1], keyPts[i][2]))
     fobj.close()
 
 def windowShow():
@@ -63,23 +63,23 @@ def windowShow():
     sys.exit(app.exec_())
 
 def calcBezier():
-    global PTS_NUM, DEGREE, idx, origPts, bezierPts
-    for i in range(int(idx / DEGREE)):
-        if origPts[i * DEGREE][2] < 0:
-            origPts[i * DEGREE][2] += 2 * math.pi
+    global PTS_NUM, DEGREE, keyIdx, keyPts, bezierPts
+    for i in range(int(keyIdx / DEGREE)):
+        if keyPts[i * DEGREE][2] < 0:
+            keyPts[i * DEGREE][2] += 2 * math.pi
         for j in range(1, DEGREE + 1):
-            delta = origPts[i * DEGREE + j][2] - origPts[i * DEGREE + j - 1][2]
+            delta = keyPts[i * DEGREE + j][2] - keyPts[i * DEGREE + j - 1][2]
             if math.fabs(delta) > math.fabs(delta + 2 * math.pi):
-                origPts[i * DEGREE + j][2] += 2 * math.pi
-        curve = bezier.Curve(origPts[i * DEGREE : (i + 1) * DEGREE + 1, :], degree = DEGREE)
+                keyPts[i * DEGREE + j][2] += 2 * math.pi
+        curve = bezier.Curve(keyPts[i * DEGREE : (i + 1) * DEGREE + 1, :], degree = DEGREE)
         s_vals = np.linspace(0.0, 1.0, PTS_NUM)
         if i == 0:
             bezierPts = curve.evaluate_multi(s_vals)
         else:
             bezierPts = np.concatenate((bezierPts, curve.evaluate_multi(s_vals)))
         for j in range(DEGREE + 1):
-            if origPts[i * DEGREE + j][2] >= math.pi:
-                origPts[i * DEGREE + j][2] -= 2 * math.pi
+            if keyPts[i * DEGREE + j][2] >= math.pi:
+                keyPts[i * DEGREE + j][2] -= 2 * math.pi
         for j in range(PTS_NUM):
             if bezierPts[i * PTS_NUM + j][2] >= math.pi:
                 bezierPts[i * PTS_NUM + j][2] -= 2 * math.pi
@@ -95,15 +95,15 @@ class MainWindow(QWidget):
         self.timer.start(10)
     
     def ptsGo(self):
-        global simidx
-        simidx += 1
+        global bezierIdx
+        bezierIdx += 1
         self.update()
 
     def paintEvent(self, event):
-        global DEGREE, ratioX, ratioY, idx
+        global DEGREE, ratioX, ratioY, keyIdx
         ratioX = 14 / self.width()
         ratioY = 14 / self.height()
-        if (idx % DEGREE == 0):
+        if (keyIdx % DEGREE == 0):
             calcBezier()
         self.drawMap()
         self.drawLinePath()
@@ -113,54 +113,54 @@ class MainWindow(QWidget):
         self.drawText()
     
     def mouseMoveEvent(self, event):
-        global DEGREE, stateMachine, ratioX, ratioY, idx, origPts
+        global DEGREE, stateMachine, ratioX, ratioY, keyIdx, keyPts
         if stateMachine == 0:
-            origPts[idx][0] = ratioX * event.pos().x()
-            origPts[idx][1] = ratioY * (self.height() - event.pos().y())
+            keyPts[keyIdx][0] = ratioX * event.pos().x()
+            keyPts[keyIdx][1] = ratioY * (self.height() - event.pos().y())
         elif stateMachine == 1:
-            if ratioX * event.pos().x() < origPts[idx][0]:
-                origPts[idx][2] = math.atan((ratioY * (self.height() - event.pos().y()) - origPts[idx][1]) / (ratioX * event.pos().x() - origPts[idx][0])) + math.pi / 2
-            elif ratioX * event.pos().x() > origPts[idx][0]:
-                origPts[idx][2] = math.atan((ratioY * (self.height() - event.pos().y()) - origPts[idx][1]) / (ratioX * event.pos().x() - origPts[idx][0])) - math.pi / 2
+            if ratioX * event.pos().x() < keyPts[keyIdx][0]:
+                keyPts[keyIdx][2] = math.atan((ratioY * (self.height() - event.pos().y()) - keyPts[keyIdx][1]) / (ratioX * event.pos().x() - keyPts[keyIdx][0])) + math.pi / 2
+            elif ratioX * event.pos().x() > keyPts[keyIdx][0]:
+                keyPts[keyIdx][2] = math.atan((ratioY * (self.height() - event.pos().y()) - keyPts[keyIdx][1]) / (ratioX * event.pos().x() - keyPts[keyIdx][0])) - math.pi / 2
             else:
-                if ratioY * (self.height() - event.pos().y()) > origPts[idx][1]:
-                    origPts[idx][2] = 0
-                elif ratioY * (self.height() - event.pos().y()) < origPts[idx][1]:
-                    origPts[idx][2] = - math.pi
+                if ratioY * (self.height() - event.pos().y()) > keyPts[keyIdx][1]:
+                    keyPts[keyIdx][2] = 0
+                elif ratioY * (self.height() - event.pos().y()) < keyPts[keyIdx][1]:
+                    keyPts[keyIdx][2] = - math.pi
         self.update()
     
     def mousePressEvent(self, event):
-        global DEGREE, stateMachine, ratioX, ratioY, idx, origPts
+        global DEGREE, stateMachine, ratioX, ratioY, keyIdx, keyPts
         if stateMachine == 0:
             if event.button() == Qt.LeftButton:
                 stateMachine = 1
             elif event.button() == Qt.RightButton:
-                if idx >= 1:
-                    origPts = np.delete(origPts, -1, 0)
-                    idx -= 1
-                    if ratioX * event.pos().x() < origPts[idx][0]:
-                        origPts[idx][2] = math.atan((ratioY * (self.height() - event.pos().y()) - origPts[idx][1]) / (ratioX * event.pos().x() - origPts[idx][0])) + math.pi / 2
-                    elif ratioX * event.pos().x() > origPts[idx][0]:
-                        origPts[idx][2] = math.atan((ratioY * (self.height() - event.pos().y()) - origPts[idx][1]) / (ratioX * event.pos().x() - origPts[idx][0])) - math.pi / 2
+                if keyIdx >= 1:
+                    keyPts = np.delete(keyPts, -1, 0)
+                    keyIdx -= 1
+                    if ratioX * event.pos().x() < keyPts[keyIdx][0]:
+                        keyPts[keyIdx][2] = math.atan((ratioY * (self.height() - event.pos().y()) - keyPts[keyIdx][1]) / (ratioX * event.pos().x() - keyPts[keyIdx][0])) + math.pi / 2
+                    elif ratioX * event.pos().x() > keyPts[keyIdx][0]:
+                        keyPts[keyIdx][2] = math.atan((ratioY * (self.height() - event.pos().y()) - keyPts[keyIdx][1]) / (ratioX * event.pos().x() - keyPts[keyIdx][0])) - math.pi / 2
                     else:
-                        if ratioY * (self.height() - event.pos().y()) > origPts[idx][1]:
-                            origPts[idx][2] = 0
-                        elif ratioY * (self.height() - event.pos().y()) < origPts[idx][1]:
-                            origPts[idx][2] = - math.pi
+                        if ratioY * (self.height() - event.pos().y()) > keyPts[keyIdx][1]:
+                            keyPts[keyIdx][2] = 0
+                        elif ratioY * (self.height() - event.pos().y()) < keyPts[keyIdx][1]:
+                            keyPts[keyIdx][2] = - math.pi
                     stateMachine = 1
         elif stateMachine == 1:
             if event.button() == Qt.LeftButton:
-                origPts = np.concatenate((origPts, np.array([origPts[idx]])))
-                idx += 1
+                keyPts = np.concatenate((keyPts, np.array([keyPts[keyIdx]])))
+                keyIdx += 1
                 stateMachine = 0
             elif event.button() == Qt.RightButton:
-                if idx >= 1:
-                    origPts[idx][2] = origPts[idx - 1][2]
+                if keyIdx >= 1:
+                    keyPts[keyIdx][2] = keyPts[keyIdx - 1][2]
                 else:
-                    origPts[idx][2] = 0
+                    keyPts[keyIdx][2] = 0
                 stateMachine = 0
-            origPts[idx][0] = ratioX * event.pos().x()
-            origPts[idx][1] = ratioY * (self.height() - event.pos().y())
+            keyPts[keyIdx][0] = ratioX * event.pos().x()
+            keyPts[keyIdx][1] = ratioY * (self.height() - event.pos().y())
         self.update()
     
     def closeEvent(self, event):
@@ -173,14 +173,14 @@ class MainWindow(QWidget):
         mapPainter.drawPixmap(self.rect(), pixmap)
     
     def drawPoint(self):
-        global stateMachine, ratioX, ratioY, idx, origPts
+        global stateMachine, ratioX, ratioY, keyIdx, keyPts
         ptPainter = QPainter(self)
         arrowPts = [QPoint(- ARROW_SIZE / 2, ARROW_SIZE * math.sqrt(3) / 2), QPoint(0, 0), QPoint(ARROW_SIZE / 2, ARROW_SIZE * math.sqrt(3) / 2)]
-        for i in range(idx + 1):
+        for i in range(keyIdx + 1):
             ptPainter.save()
-            ptPainter.translate(origPts[i][0] / ratioX, self.height() - origPts[i][1] / ratioY)
-            ptPainter.rotate(- origPts[i][2] * 180 / math.pi)
-            if (i == idx):
+            ptPainter.translate(keyPts[i][0] / ratioX, self.height() - keyPts[i][1] / ratioY)
+            ptPainter.rotate(- keyPts[i][2] * 180 / math.pi)
+            if (i == keyIdx):
                 if (stateMachine == 0):
                     arrowPen = QPen(Qt.red, 2)
                 else:
@@ -197,56 +197,56 @@ class MainWindow(QWidget):
             ptPainter.restore()
     
     def drawSim(self):
-        global DEGREE, ratioX, ratioY, idx, simidx, bezierPts
+        global DEGREE, ratioX, ratioY, keyIdx, bezierIdx, bezierPts
         simPainter = QPainter(self)
         arrowPen = QPen(Qt.cyan, 2)
         simPainter.setPen(arrowPen)
         arrowPts = [QPoint(- ARROW_SIZE / 2, ARROW_SIZE * math.sqrt(3) / 2), QPoint(0, 0), QPoint(ARROW_SIZE / 2, ARROW_SIZE * math.sqrt(3) / 2)]
-        if simidx < PTS_NUM * int(idx / DEGREE) - 1:
-            simPainter.translate(bezierPts[simidx][0] / ratioX, self.height() - bezierPts[simidx][1] / ratioY)
-            simPainter.rotate(- bezierPts[simidx][2] * 180 / math.pi)
+        if bezierIdx < PTS_NUM * int(keyIdx / DEGREE) - 1:
+            simPainter.translate(bezierPts[bezierIdx][0] / ratioX, self.height() - bezierPts[bezierIdx][1] / ratioY)
+            simPainter.rotate(- bezierPts[bezierIdx][2] * 180 / math.pi)
             simPainter.drawPolyline(QPolygon(arrowPts))
             simPainter.drawEllipse(-2, -2, 4, 4)
         else:
-            simidx = 0
+            bezierIdx = 0
     
     def drawLinePath(self):
-        global stateMachine, ratioX, ratioY, idx, origPts
-        if (idx >= 1):
+        global stateMachine, ratioX, ratioY, keyIdx, keyPts
+        if (keyIdx >= 1):
             linePathPainter = QPainter(self)
             pathPen = QPen(Qt.yellow, 1)
             linePathPainter.setPen(pathPen)
-            for i in range(idx - 1):
-                linePathPainter.drawLine(origPts[i][0] / ratioX, self.height() - origPts[i][1] / ratioY, origPts[i + 1][0] / ratioX, self.height() - origPts[i + 1][1] / ratioY)
+            for i in range(keyIdx - 1):
+                linePathPainter.drawLine(keyPts[i][0] / ratioX, self.height() - keyPts[i][1] / ratioY, keyPts[i + 1][0] / ratioX, self.height() - keyPts[i + 1][1] / ratioY)
             if stateMachine == 0:
                 pathPen = QPen(Qt.yellow, 0.5)
                 linePathPainter.setPen(pathPen)
-            linePathPainter.drawLine(origPts[idx - 1][0] / ratioX, self.height() - origPts[idx - 1][1] / ratioY, origPts[idx][0] / ratioX, self.height() - origPts[idx][1] / ratioY)
+            linePathPainter.drawLine(keyPts[keyIdx - 1][0] / ratioX, self.height() - keyPts[keyIdx - 1][1] / ratioY, keyPts[keyIdx][0] / ratioX, self.height() - keyPts[keyIdx][1] / ratioY)
 
     def drawBezierPath(self):
-        global PTS_NUM, DEGREE, ratioX, ratioY, idx, bezierPts
+        global PTS_NUM, DEGREE, ratioX, ratioY, keyIdx, bezierPts
         bezierPathPainter = QPainter(self)
         pathPen = QPen(Qt.green, 2)
         bezierPathPainter.setPen(pathPen)
-        for i in range(PTS_NUM * int(idx / DEGREE) - 1):
+        for i in range(PTS_NUM * int(keyIdx / DEGREE) - 1):
             bezierPathPainter.drawLine(bezierPts[i][0] / ratioX, self.height() - bezierPts[i][1] / ratioY, bezierPts[i + 1][0] / ratioX, self.height() - bezierPts[i + 1][1] / ratioY)
     
     def drawText(self):
-        global MARGIN, PTS_NUM, DEGREE, idx, subidx, origPts, bezierPts
+        global MARGIN, PTS_NUM, DEGREE, keyIdx, bezierIdx, keyPts, bezierPts
         textPainter = QPainter(self)
         textPainter.setPen(Qt.white)
         textPainter.setFont(QFont('等线', 10))
         textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  20), "模式: %d阶贝塞尔曲线" % DEGREE)
-        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  40), "段数: %d" % int((idx - 1) / DEGREE))
-        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  60), "点数: %d => %d" % (idx, PTS_NUM * int(idx / DEGREE)))
+        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  40), "段数: %d" % int((keyIdx - 1) / DEGREE))
+        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  60), "点数: %d => %d" % (keyIdx, PTS_NUM * int(keyIdx / DEGREE)))
         textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  100), "仿真点")
-        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  120), "X: %.3f m" % bezierPts[simidx][0])
-        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  140), "Y: %.3f m" % bezierPts[simidx][1])
-        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  160), "Z: %.2f deg" % (bezierPts[simidx][2] / math.pi * 180))
-        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  200), "指针: %s" % ('端点' if idx % DEGREE == 0 else '控制点'))
-        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  220), "X: %.3f m" % origPts[idx][0])
-        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  240), "Y: %.3f m" % origPts[idx][1])
-        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  260), "Z: %.2f deg" % (origPts[idx][2] / math.pi * 180))
+        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  120), "X: %.3f m" % bezierPts[bezierIdx][0])
+        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  140), "Y: %.3f m" % bezierPts[bezierIdx][1])
+        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  160), "Z: %.2f deg" % (bezierPts[bezierIdx][2] / math.pi * 180))
+        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  200), "指针: %s" % ('端点' if keyIdx % DEGREE == 0 else '控制点'))
+        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  220), "X: %.3f m" % keyPts[keyIdx][0])
+        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  240), "Y: %.3f m" % keyPts[keyIdx][1])
+        textPainter.drawText(QPoint(MARGIN[0] / ratioX, MARGIN[1] / ratioY +  260), "Z: %.2f deg" % (keyPts[keyIdx][2] / math.pi * 180))
 
 if __name__ == '__main__':
     readPts()

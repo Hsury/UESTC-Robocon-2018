@@ -33,6 +33,10 @@ def merge():
     vector3.x = offset[0] + gyroData[0]
     vector3.y = offset[1] + gyroData[1]
     vector3.z = offset[2] + gyroData[2]
+    while (vector3.z <= - math.pi):
+        vector3.z += 2 * math.pi
+    while (vector3.z > math.pi):
+        vector3.z -= 2 * math.pi
     if RESET == True and lock == False:
         offset[0] = - vector3.x
         offset[1] = - vector3.y
