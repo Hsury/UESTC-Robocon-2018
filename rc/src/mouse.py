@@ -16,7 +16,7 @@ def setup():
     global pub
     rospy.init_node('mouse', anonymous = True)
     initMouse()
-    rospy.Subscriber("gyro", Vector3, gyroCB)
+    rospy.Subscriber("position", Vector3, gyroCB)
     pub = rospy.Publisher('mouse', Vector3, queue_size = 1)
 
 def loop():

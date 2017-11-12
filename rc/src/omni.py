@@ -19,7 +19,7 @@ def setup():
     initSerial()
     initElmo()
     rospy.Subscriber("vel", Vector3, velCB)
-    rospy.Subscriber("gyro", Vector3, gyroCB)
+    rospy.Subscriber("position", Vector3, gyroCB)
 
 def loop():
     global com, vel

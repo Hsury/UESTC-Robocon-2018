@@ -9,7 +9,7 @@ from geometry_msgs.msg import Vector3
 PARENT_PATH = os.path.dirname(os.getcwd())
 
 SLEEP = 2
-INTERVAL = 1
+INTERVAL = 0.1
 
 goalX = []
 goalY = []
