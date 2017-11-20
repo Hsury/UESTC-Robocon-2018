@@ -20,9 +20,8 @@ class Elmo():
         try:
             self._serial.reset_input_buffer()
             self.write(cmd)
-            for i in range(2):
-                if self._serial.read_until(';'.encode()).startswith(cmd.encode()):
-                    break
+            while not self._serial.read_until(';'.encode()).startswith(cmd.encode()):
+                pass
             return int(self._serial.read_until(';'.encode())[:-1])
         except:
             pass
@@ -39,7 +38,6 @@ class Elmo():
         print('Testing Elmo...')
         print('  Port: {}'.format(self._port))
         print('  Baudrate: {}'.format(self._baudrate))
-        self.reset()
         print('  Step 1/4: Get serial number: {}'.format(self.sn))
         print('  Step 2/4: Forward')
         self.speed = 5E4

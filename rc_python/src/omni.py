@@ -16,8 +16,6 @@ class Omni():
                           Elmo(self._port[1], self._baudrate), \
                           Elmo(self._port[2], self._baudrate)]
         self._speedList = [0] * 3
-        for eachElmo in self._elmoList:
-            eachElmo.reset()
     
     def test(self):
         from time import sleep
