@@ -9,7 +9,7 @@ class Mecanum():
     SIDE_LENGTH = 1.01
     REDUCTION_RATIO = 1
 
-    def __init__(self, leftFrontPort='/dev/ttyUSB0', leftRearPort='/dev/ttyUSB1', rightFrontPort='/dev/ttyUSB2', rightRearPort='/dev/ttyUSB3', baudrate=19200):
+    def __init__(self, leftFrontPort='/dev/elmo0', leftRearPort='/dev/elmo1', rightFrontPort='/dev/elmo2', rightRearPort='/dev/elmo3', baudrate=19200):
         self._port = [leftFrontPort, leftRearPort, rightFrontPort, rightRearPort]
         self._baudrate = baudrate
         self._elmoList = [Elmo(self._port[0], self._baudrate), \
@@ -66,5 +66,5 @@ class Mecanum():
             self._elmoList[idx].disable()
 
 if __name__=='__main__':
-    mecanum = Mecanum('/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyUSB2', '/dev/ttyUSB3', 19200)
+    mecanum = Mecanum('/dev/elmo0', '/dev/elmo1', '/dev/elmo2', '/dev/elmo3', 19200)
     mecanum.test()

@@ -6,7 +6,7 @@ class Merge():
     '''UESTC 2018 Robocon Team
     Position Merge Package
     '''
-    def __init__(self, gyroPort='/dev/ttyUSB3', gyroBaudrate=921600):
+    def __init__(self, gyroPort='/dev/gyro', gyroBaudrate=921600):
         self._gyroPort = gyroPort
         self._gyroBaudrate = gyroBaudrate
         self._gyro = Gyro(self._gyroPort, self._gyroBaudrate)
@@ -55,5 +55,5 @@ class Merge():
         return self._position
 
 if __name__=='__main__':
-    merge = Merge('/dev/ttyUSB3', 921600)
+    merge = Merge('/dev/gyro', 921600)
     merge.test()

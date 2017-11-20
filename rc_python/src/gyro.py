@@ -6,7 +6,7 @@ class Gyro():
     '''UESTC 2018 Robocon Team
     Gyro Driver Package
     '''
-    def __init__(self, port='/dev/ttyUSB3', baudrate=921600):
+    def __init__(self, port='/dev/gyro', baudrate=921600):
         self._port = port
         self._baudrate = baudrate
         self._data = [0] * 3
@@ -50,5 +50,5 @@ class Gyro():
         return self._data
 
 if __name__=='__main__':
-    gyro = Gyro('/dev/ttyUSB3', 921600)
+    gyro = Gyro('/dev/gyro', 921600)
     gyro.test()

@@ -7,7 +7,7 @@ class Elmo():
     SPEED_MODE = 2
     POSITION_MODE = 4
 
-    def __init__(self, port='/dev/ttyUSB0', baudrate=19200):
+    def __init__(self, port='/dev/elmo0', baudrate=19200):
         self._port = port
         self._baudrate = baudrate
         try:
@@ -117,5 +117,5 @@ class Elmo():
     position = property(getPosition, setPosition)
 
 if __name__=='__main__':
-    elmo = Elmo('/dev/ttyUSB0', 19200)
+    elmo = Elmo('/dev/elmo0', 19200)
     elmo.test()

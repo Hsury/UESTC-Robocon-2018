@@ -9,7 +9,7 @@ class Omni():
     SIDE_LENGTH = 1.01
     REDUCTION_RATIO = 19
 
-    def __init__(self, headPort='/dev/ttyUSB0', leftPort='/dev/ttyUSB1', rightPort='/dev/ttyUSB2', baudrate=19200):
+    def __init__(self, headPort='/dev/elmo0', leftPort='/dev/elmo1', rightPort='/dev/elmo2', baudrate=19200):
         self._port = [headPort, leftPort, rightPort]
         self._baudrate = baudrate
         self._elmoList = [Elmo(self._port[0], self._baudrate), \
@@ -63,5 +63,5 @@ class Omni():
             self._elmoList[idx].disable()
 
 if __name__=='__main__':
-    omni = Omni('/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyUSB2', 19200)
+    omni = Omni('/dev/elmo0', '/dev/elmo1', '/dev/elmo2', 19200)
     omni.test()
