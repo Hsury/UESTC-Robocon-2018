@@ -12,39 +12,42 @@ class Viewer():
     '''UESTC 2018 Robocon Team
     Viewer
     '''
-    def __init__(self, dash, merge):
+    def __init__(self, dash):
         self._dash = dash
-        self._merge = merge
         try:
             mp.set_start_method('spawn')
         except:
             pass
-        self._goalQ = mp.Queue()
+        self._getGoalQ = mp.Queue()
+        self._setGoalQ = mp.Queue()
         self._position = mp.Array('d', [0] * 3)
         self._speed = mp.Array('d', [0] * 3)
-        p = mp.Process(target=ViewerWindow, args=(self._goalQ, self._position, self._speed))
+        p = mp.Process(target=ViewerWindow, args=(self._getGoalQ, self._setGoalQ, self._position, self._speed))
         p.start()
-        proxyThd = threading.Thread(target=self._proxy, args=(p,))
+        proxyThd = threading.Thread(target=self.__proxy, args=(p,))
         proxyThd.setDaemon(True)
         proxyThd.start()
     
-    def _proxy(self, p):
+    def __proxy(self, p):
         from time import sleep
         while p.is_alive():
             for idx in range(3):
-                self._position[idx] = self._merge.data[idx]
+                self._position[idx] = self._dash._merge.data[idx]
             for idx in range(3):
                 self._speed[idx] = self._dash.speed[idx]
             try:
-                buffer = self._goalQ.get(block=False)
-                if buffer[3]:
-                    self._dash.to(buffer[0], buffer[1], buffer[2])
-                    self._dash.unlock()
-                else:
-                    self._dash.lock()
+                while self._setGoalQ.qsize() != 0:
+                    buffer = self._setGoalQ.get(block=False)
+                    if buffer[3]:
+                        self._dash.to(buffer[0], buffer[1], buffer[2])
+                        self._dash.unlock()
+                    else:
+                        self._dash.lock()
+                if self._getGoalQ.qsize() == 0:
+                    self._getGoalQ.put(self._dash.goal)
             except:
                 pass
-            sleep(0.001)
+            sleep(0.005)
 
 class ViewerWindow(QWidget):
     MAP_SIZE = 800
@@ -53,10 +56,11 @@ class ViewerWindow(QWidget):
     LINE_ERR = 0.001
     ANGULAR_ERR = 0.5
 
-    def __init__(self, goal, position, speed):
+    def __init__(self, getGoalQ, setGoalQ, position, speed):
         app = QApplication(sys.argv)
         super(ViewerWindow, self).__init__()
-        self._goalQ = goal
+        self._getGoalQ = getGoalQ
+        self._setGoalQ = setGoalQ
         self._position = position
         self._speed = speed
         self._dataDir = os.path.dirname(os.getcwd()) + os.sep + 'data'
@@ -65,12 +69,12 @@ class ViewerWindow(QWidget):
         self._cursor = [0] * 3
         self._goal = [0] * 3
         self._stateMachine = 0
-        self._loadPath()
+        self.__loadPath()
         self.setWindowTitle('UESTC Robocon 2018 - 控制台')
         self.resize(ViewerWindow.MAP_SIZE, ViewerWindow.MAP_SIZE)
         self.setMouseTracking(True)
         self.timer = QTimer()
-        self.timer.timeout.connect(self._timer)
+        self.timer.timeout.connect(self.__timer)
         self.timer.start(10)
         self.show()
         sys.exit(app.exec_())
@@ -78,10 +82,10 @@ class ViewerWindow(QWidget):
     def paintEvent(self, event):
         self._ratioX = 14 / self.width()
         self._ratioY = 14 / self.height()
-        self._drawMap()
-        self._drawPath()
-        self._drawPoint()
-        self._drawText()
+        self.__drawMap()
+        self.__drawPath()
+        self.__drawPoint()
+        self.__drawText()
     
     def mouseMoveEvent(self, event):
         if self._stateMachine == 0:
@@ -103,11 +107,12 @@ class ViewerWindow(QWidget):
             if event.button() == Qt.LeftButton:
                 self._stateMachine = 1
             elif event.button() == Qt.RightButton:
-                self._goalQ.put([0, 0, 0, 0])
+                self._cursor[2] = self._goal[2]
+                self._setGoalQ.put([0, 0, 0, 0])
         elif self._stateMachine == 1:
             if event.button() == Qt.LeftButton:
                 self._goal = self._cursor[0], self._cursor[1], self._cursor[2]
-                self._goalQ.put([self._goal[0], self._goal[1], self._goal[2], 1])
+                self._setGoalQ.put([self._goal[0], self._goal[1], self._goal[2], 1])
                 self._stateMachine = 0
             elif event.button() == Qt.RightButton:
                 self._cursor[2] = self._goal[2]
@@ -115,7 +120,7 @@ class ViewerWindow(QWidget):
             self._cursor[0] = self._ratioX * event.pos().x()
             self._cursor[1] = self._ratioY * (self.height() - event.pos().y())
     
-    def _loadPath(self):
+    def __loadPath(self):
         try:
             with open(self._dataDir + os.sep + 'rc_bezier.txt', 'r') as fobj:
                 for eachline in fobj:
@@ -124,17 +129,23 @@ class ViewerWindow(QWidget):
         except:
             pass
     
-    def _timer(self):
+    def __timer(self):
+        try:
+            while self._getGoalQ.qsize() != 0:
+                buffer = self._getGoalQ.get(block=False)
+                self._goal = buffer
+        except:
+            pass
         if fabs(self._positionList[-1][0] - self._position[0]) > ViewerWindow.LINE_ERR or fabs(self._positionList[-1][1] - self._position[1]) > ViewerWindow.LINE_ERR or fabs(self._positionList[-1][2] - self._position[2]) > ViewerWindow.ANGULAR_ERR:
             self._positionList = np.concatenate((self._positionList, np.array([self._position])))
         self.update()
     
-    def _drawMap(self):
+    def __drawMap(self):
         mapPainter = QPainter(self)
         pixmap = QPixmap(self._dataDir + os.sep + "map.png")
         mapPainter.drawPixmap(self.rect(), pixmap)
     
-    def _drawPoint(self):
+    def __drawPoint(self):
         ptPainter = QPainter(self)
         arrowPts = [QPoint(- ViewerWindow.ARROW_SIZE / 2, ViewerWindow.ARROW_SIZE * sqrt(3) / 2), QPoint(0, 0), QPoint(ViewerWindow.ARROW_SIZE / 2, ViewerWindow.ARROW_SIZE * sqrt(3) / 2)]
         ptPainter.save()
@@ -162,7 +173,7 @@ class ViewerWindow(QWidget):
         ptPainter.drawPolyline(QPolygon(arrowPts))
         ptPainter.restore()
     
-    def _drawPath(self):
+    def __drawPath(self):
         pathPainter = QPainter(self)
         pathPen = QPen(Qt.green, 1)
         pathPainter.setPen(pathPen)
@@ -179,7 +190,7 @@ class ViewerWindow(QWidget):
         pathPainter.setPen(pathPen)
         pathPainter.drawLine(self._positionList[-1][0] / self._ratioX, self.height() - self._positionList[-1][1] / self._ratioY, self._cursor[0] / self._ratioX, self.height() - self._cursor[1] / self._ratioY)
     
-    def _drawText(self):
+    def __drawText(self):
         textPainter = QPainter(self)
         textPainter.setPen(Qt.white)
         textPainter.setFont(QFont('等线', 10))
@@ -206,4 +217,4 @@ if __name__=='__main__':
     omni = Omni()
     merge = Merge()
     dash = Dash(omni, merge)
-    viewer = Viewer(dash, merge)
+    viewer = Viewer(dash)

@@ -1,6 +1,6 @@
 from math import sin, cos, pi, sqrt
-import sys
 import os
+import threading
 import numpy as np
 
 class Feed():
@@ -11,10 +11,11 @@ class Feed():
         self._dash = dash
         self._filename = filename
         self._dataDir = os.path.dirname(os.getcwd()) + os.sep + 'data'
+        self._ctrl = -1
         self._feedList = np.empty(shape=[0, 3])
-        self._loadPath()
+        self.__loadPath()
     
-    def _loadPath(self):
+    def __loadPath(self):
         try:
             with open(self._dataDir + os.sep + self._filename, 'r') as fobj:
                 for eachline in fobj:
@@ -23,18 +24,46 @@ class Feed():
         except:
             pass
     
-    def broadcast(self, interval=0.1, zero=0, step=1):
+    def __broadcast(self, interval=0.1, zero=0, step=1):
         from time import sleep
-        self._dash.discard()
+        self._ctrl = 0
         self._dash.unlock()
-        for idx in range(zero, len(self._feedList), step):
-            self._dash.to(self._feedList[idx][0], self._feedList[idx][1], self._feedList[idx][2])
-            print("No.{}, X={:.4f}, Y={:.4f}, Z={:.4f}".format(idx + 1, self._feedList[idx][0], self._feedList[idx][1], self._feedList[idx][2]), end='\r')
-            sys.stdout.flush()
+        for self._idx in range(zero, len(self._feedList), step):
+            while self._ctrl == 1:
+                sleep(0.005)
+            if self._ctrl == 2:
+                break
+            self._dash.to(self._feedList[self._idx][0], self._feedList[self._idx][1], self._feedList[self._idx][2])
             sleep(interval)
-        print()
-        self._dash.discard()
+            if self._dash.locked == True or self._dash.mode != self._dash.POSITION_MODE or self._dash.goal != self._feedList[self._idx].tolist():
+                self.pause()
+        self._dash.lock()
+        self._ctrl = -1
+    
+    def play(self, interval=0.1, zero=0, step=1):
+        if self._ctrl == -1:
+            broadcastThd = threading.Thread(target=self.__broadcast, args=(interval, zero, step))
+            broadcastThd.setDaemon(True)
+            broadcastThd.start()
+    
+    def resume(self):
+        if self._ctrl != -1:
+            self._ctrl = 0
+            self._dash.unlock()
+    
+    def pause(self):
+        if self._ctrl != -1:
+            self._ctrl = 1
+    
+    def stop(self):
+        if self._ctrl != -1:
+            self._ctrl = 2
     
     @property
     def data(self):
-        return self._feedList
+        return self._feedList.tolist()
+
+    @property
+    def status(self):
+        if self._ctrl != -1:
+            return (self._idx + 1, self._feedList[self._idx].tolist())

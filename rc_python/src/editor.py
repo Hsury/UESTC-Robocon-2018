@@ -36,12 +36,12 @@ class EditorWindow(QWidget):
         self._endIdx = 0
         self._bezierIdx = -1
         self._stateMachine = 0
-        self._loadPath()
+        self.__loadPath()
         self.setWindowTitle('UESTC Robocon 2018 - 路径编辑器')
         self.resize(EditorWindow.MAP_SIZE, EditorWindow.MAP_SIZE)
         self.setMouseTracking(True)
         self.timer = QTimer()
-        self.timer.timeout.connect(self._timer)
+        self.timer.timeout.connect(self.__timer)
         self.timer.start(10)
         self.show()
         sys.exit(app.exec_())
@@ -50,13 +50,13 @@ class EditorWindow(QWidget):
         self._ratioX = 14 / self.width()
         self._ratioY = 14 / self.height()
         if self._endIdx % self._degree == 0:
-            self._calcBezier()
-        self._drawMap()
-        self._drawLinePath()
-        self._drawBezierPath()
-        self._drawPoint()
-        self._drawSim()
-        self._drawText()
+            self.__calcBezier()
+        self.__drawMap()
+        self.__drawLinePath()
+        self.__drawBezierPath()
+        self.__drawPoint()
+        self.__drawSim()
+        self.__drawText()
     
     def mouseMoveEvent(self, event):
         if self._stateMachine == 0:
@@ -106,9 +106,9 @@ class EditorWindow(QWidget):
             self._endList[self._endIdx][1] = self._ratioY * (self.height() - event.pos().y())
     
     def closeEvent(self, event):
-        self._savePath()
+        self.__savePath()
     
-    def _loadPath(self):
+    def __loadPath(self):
         try:
             with open(self._dataDir + os.sep + 'rc_points.txt', 'r') as fobj:
                 for eachline in fobj:
@@ -118,10 +118,10 @@ class EditorWindow(QWidget):
                     self._endIdx += 1
         except:
             pass
-        self._calcBezier()
+        self.__calcBezier()
     
-    def _savePath(self):
-        self._calcBezier()
+    def __savePath(self):
+        self.__calcBezier()
         try:
             with open(self._dataDir + os.sep + 'rc_points.txt', 'w') as fobj:
                 for idx in range(self._endIdx):
@@ -132,11 +132,11 @@ class EditorWindow(QWidget):
         except:
             pass
     
-    def _timer(self):
+    def __timer(self):
         self._bezierIdx += 1
         self.update()
     
-    def _calcBezier(self):
+    def __calcBezier(self):
         for i in range(int(self._endIdx / self._degree)):
             if self._endList[i * self._degree][2] < 0:
                 self._endList[i * self._degree][2] += 2 * pi
@@ -157,12 +157,12 @@ class EditorWindow(QWidget):
                 if self._bezierList[i * self._sampling + j][2] >= pi:
                     self._bezierList[i * self._sampling + j][2] -= 2 * pi
     
-    def _drawMap(self):
+    def __drawMap(self):
         mapPainter = QPainter(self)
         pixmap = QPixmap(self._dataDir + os.sep + "map.png")
         mapPainter.drawPixmap(self.rect(), pixmap)
     
-    def _drawPoint(self):
+    def __drawPoint(self):
         ptPainter = QPainter(self)
         arrowPts = [QPoint(- EditorWindow.ARROW_SIZE / 2, EditorWindow.ARROW_SIZE * sqrt(3) / 2), QPoint(0, 0), QPoint(EditorWindow.ARROW_SIZE / 2, EditorWindow.ARROW_SIZE * sqrt(3) / 2)]
         for i in range(self._endIdx + 1):
@@ -185,7 +185,7 @@ class EditorWindow(QWidget):
                 ptPainter.drawEllipse(-3, -3, 6, 6)
             ptPainter.restore()
     
-    def _drawSim(self):
+    def __drawSim(self):
         simPainter = QPainter(self)
         arrowPen = QPen(Qt.cyan, 2)
         simPainter.setPen(arrowPen)
@@ -198,7 +198,7 @@ class EditorWindow(QWidget):
         else:
             self._bezierIdx = 0
     
-    def _drawLinePath(self):
+    def __drawLinePath(self):
         if (self._endIdx >= 1):
             linePathPainter = QPainter(self)
             pathPen = QPen(Qt.yellow, 1)
@@ -210,14 +210,14 @@ class EditorWindow(QWidget):
                 linePathPainter.setPen(pathPen)
             linePathPainter.drawLine(self._endList[self._endIdx - 1][0] / self._ratioX, self.height() - self._endList[self._endIdx - 1][1] / self._ratioY, self._endList[self._endIdx][0] / self._ratioX, self.height() - self._endList[self._endIdx][1] / self._ratioY)
 
-    def _drawBezierPath(self):
+    def __drawBezierPath(self):
         bezierPathPainter = QPainter(self)
         pathPen = QPen(Qt.green, 2)
         bezierPathPainter.setPen(pathPen)
         for i in range(self._sampling * int(self._endIdx / self._degree) - 1):
             bezierPathPainter.drawLine(self._bezierList[i][0] / self._ratioX, self.height() - self._bezierList[i][1] / self._ratioY, self._bezierList[i + 1][0] / self._ratioX, self.height() - self._bezierList[i + 1][1] / self._ratioY)
     
-    def _drawText(self):
+    def __drawText(self):
         textPainter = QPainter(self)
         textPainter.setPen(Qt.white)
         textPainter.setFont(QFont('等线', 10))

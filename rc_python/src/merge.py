@@ -4,7 +4,7 @@ import threading
 
 class Merge():
     '''UESTC 2018 Robocon Team
-    Position Merge Package
+    Merge Package
     '''
     def __init__(self, gyroPort='/dev/gyro', gyroBaudrate=921600):
         self._gyroPort = gyroPort
@@ -27,7 +27,7 @@ class Merge():
             while self._position[2] > pi:
                 self._position[2] -= 2 * pi
             self._count += 1
-            sleep(0.001)
+            sleep(0.005)
     
     def reset(self):
         self.swift()

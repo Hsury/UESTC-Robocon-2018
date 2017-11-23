@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "gdb",
+            "request": "launch",
+            "cwd": "${workspaceRoot}",
+            "name": "PlatformIO Debugger",
+            "target": "c:/Users/Ruoya/Documents/rc2018-test/HsuRY/rc_joy_wireless/.pioenvs/esp12e/firmware.elf",
+            "gdbpath": "C:/Users/Ruoya/.platformio/penv/Scripts/piodebuggdb",
+            "autorun": [ "source .pioinit" ]
+        }
+    ]
+}
