@@ -37,7 +37,8 @@ class Omni():
         self.go()
         print('Done')
     
-    def resolve(self, vX=0, vY=0, wZ=0, orient=0):
+    @classmethod
+    def resolve(cls, vX=0, vY=0, wZ=0, orient=0):
         w2v = lambda w: w * Omni.SIDE_LENGTH / sqrt(3)
         v2jv = lambda v: int(v / (2 * pi * Omni.WHEEL_RADIUS) * Omni.REDUCTION_RATIO * 2000)
         return [v2jv(- vX * cos(orient) - vY * sin(orient) + w2v(wZ)), \

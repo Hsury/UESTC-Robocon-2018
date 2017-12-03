@@ -39,7 +39,8 @@ class Mecanum():
         self.go()
         print('Done')
     
-    def resolve(self, vX=0, vY=0, wZ=0, orient=0):
+    @classmethod
+    def resolve(cls, vX=0, vY=0, wZ=0, orient=0):
         w2v = lambda w: w * Mecanum.SIDE_LENGTH * sqrt(2) / 2
         v2jv = lambda v: int(v / (2 * pi * Mecanum.WHEEL_RADIUS) * Mecanum.REDUCTION_RATIO * 2000)
         return [- v2jv((vX * sin(pi / 4 - orient) + vY * cos(pi / 4 - orient) - w2v(wZ)) * sqrt(2)), \
