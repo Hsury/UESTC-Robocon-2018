@@ -9,8 +9,9 @@ class Plot():
     '''UESTC 2018 Robocon Team
     Plot Package
     '''
-    def __init__(self, filename='rc_bezier.txt'):
+    def __init__(self, filename='rc_bezier.txt', interval=0.1):
         self._filename = filename
+        self._interval = interval
         self._dataDir = os.path.dirname(os.getcwd()) + os.sep + 'data'
         self.__loadPath()
         self.__show()
@@ -28,13 +29,13 @@ class Plot():
                 for eachline in fobj:
                     self._locList = np.concatenate((self._locList, np.array([[float(data) for data in eachline.split(' ')]])))
                     if (len(self._locList) >= 2):
-                        self._spdList = np.concatenate((self._spdList, np.array([[self._locList[-1, i] - self._locList[-2, i] for i in range(3)]])))
+                        self._spdList = np.concatenate((self._spdList, np.array([[(self._locList[-1, i] - self._locList[-2, i]) / self._interval for i in range(3)]])))
                         self._spdMecanumList = np.concatenate((self._spdMecanumList, np.array([Mecanum.resolve(self._spdList[-1, 0], self._spdList[-1, 1], self._spdList[-1, 2], (self._locList[-1, 2] + self._locList[-2, 2]) / 2)])))
                         self._spdOmniList = np.concatenate((self._spdOmniList, np.array([Omni.resolve(self._spdList[-1, 0], self._spdList[-1, 1], self._spdList[-1, 2], (self._locList[-1, 2] + self._locList[-2, 2]) / 2)])))
                         if (len(self._locList) >= 3):
-                            self._accList = np.concatenate((self._accList, np.array([[self._spdList[-1, i] - self._spdList[-2, i] for i in range(3)]])))
-                            self._accMecanumList = np.concatenate((self._accMecanumList, np.array([[self._spdMecanumList[-1, i] - self._spdMecanumList[-2, i] for i in range(4)]])))
-                            self._accOmniList = np.concatenate((self._accOmniList, np.array([[self._spdOmniList[-1, i] - self._spdOmniList[-2, i] for i in range(3)]])))
+                            self._accList = np.concatenate((self._accList, np.array([[(self._spdList[-1, i] - self._spdList[-2, i]) / self._interval for i in range(3)]])))
+                            self._accMecanumList = np.concatenate((self._accMecanumList, np.array([[(self._spdMecanumList[-1, i] - self._spdMecanumList[-2, i]) / self._interval for i in range(4)]])))
+                            self._accOmniList = np.concatenate((self._accOmniList, np.array([[(self._spdOmniList[-1, i] - self._spdOmniList[-2, i]) / self._interval for i in range(3)]])))
         except:
             pass
     
