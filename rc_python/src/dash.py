@@ -26,9 +26,9 @@ class Dash():
             if not self._lock:
                 if self.mode == Dash.POSITION_MODE:
                     self.__resolve(self._merge.data, self._goal)
-                self._speed[0] = self.__limiter(self._speed[0], -2, 2)
-                self._speed[1] = self.__limiter(self._speed[1], -2, 2)
-                self._speed[2] = self.__limiter(self._speed[2], - pi / 2, pi / 2)
+                #self._speed[0] = self.__limiter(self._speed[0], -2, 2)
+                #self._speed[1] = self.__limiter(self._speed[1], -2, 2)
+                #self._speed[2] = self.__limiter(self._speed[2], - pi / 2, pi / 2)
                 self._base.go(self._speed[0], self._speed[1], self._speed[2], self._merge.data[2])
             sleep(0.005)
     
@@ -39,8 +39,19 @@ class Dash():
             self._dist[2] += 2 * pi
         while self._dist[2] > pi:
             self._dist[2] -= 2 * pi
-        for idx in range(3):
-            self._speed[idx] = self._dist[idx] / 2
+        # Under Construction
+        _maxSpd = 3
+        _smplgPd = 0.15
+        _linearCoefP = 0.1
+        _angularCoefP = 1
+        self._resDist = sqrt(self._dist[0] ** 2 + self._dist[1] ** 2)
+        if self._resDist > _smplgPd * _maxSpd:
+            self._speed[0] = self._dist[0] * _maxSpd / self._resDist
+            self._speed[1] = self._dist[1] * _maxSpd / self._resDist
+        else:
+            self._speed[0] = self._dist[0] * _linearCoefP
+            self._speed[1] = self._dist[1] * _linearCoefP
+        self._speed[2] = self._dist[2] * _angularCoefP
 
     def __limiter(self, value, lower, upper):
         if value < lower:

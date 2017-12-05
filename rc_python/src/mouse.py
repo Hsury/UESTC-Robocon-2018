@@ -4,7 +4,7 @@ import threading
 
 class Mouse():
     '''UESTC 2018 Robocon Team
-    Mouse Driver Package
+    Mouse Package
     '''
     def __init__(self, merge, port='/dev/input/event3'):
         self._merge = merge
@@ -28,6 +28,9 @@ class Mouse():
                 if event.code == ecodes.REL_Y:
                     self._x += event.value * sin(self._merge.data[2])
                     self._y -= event.value * cos(self._merge.data[2])
+    
+    def test(self):
+        print(self._dev)
     
     @property
     def data(self):

@@ -9,7 +9,7 @@ class Plot():
     '''UESTC 2018 Robocon Team
     Plot Package
     '''
-    def __init__(self, filename='rc_bezier.txt', interval=0.1):
+    def __init__(self, filename='rc_trace.txt', interval=0.001):
         self._filename = filename
         self._interval = interval
         self._dataDir = os.path.dirname(os.getcwd()) + os.sep + 'data'
@@ -17,54 +17,72 @@ class Plot():
         self.__show()
     
     def __loadPath(self):
-        self._locList = np.empty(shape=[0, 3])
-        self._spdList = np.empty(shape=[0, 3])
-        self._spdMecanumList = np.empty(shape=[0, 4])
-        self._spdOmniList = np.empty(shape=[0, 3])
-        self._accList = np.empty(shape=[0, 3])
-        self._accMecanumList = np.empty(shape=[0, 4])
-        self._accOmniList = np.empty(shape=[0, 3])
+        self._position = np.empty(shape=[0, 3])
+        self._goal = np.empty(shape=[0, 3])
+        self._idealSpeed = np.empty(shape=[0, 3])
+        self._idealSpeedMecanum = np.empty(shape=[0, 4])
+        self._idealSpeedOmni = np.empty(shape=[0, 3])
+        self._realSpeed = np.empty(shape=[0, 3])
+        self._realSpeedMecanum = np.empty(shape=[0, 4])
+        self._realSpeedOmni = np.empty(shape=[0, 3])
+        self._idealAccel = np.empty(shape=[0, 3])
+        self._idealAccelMecanum = np.empty(shape=[0, 4])
+        self._idealAccelOmni = np.empty(shape=[0, 3])
+        self._realAccel = np.empty(shape=[0, 3])
+        self._realAccelMecanum = np.empty(shape=[0, 4])
+        self._realAccelOmni = np.empty(shape=[0, 3])
         try:
             with open(self._dataDir + os.sep + self._filename, 'r') as fobj:
                 for eachline in fobj:
-                    self._locList = np.concatenate((self._locList, np.array([[float(data) for data in eachline.split(' ')]])))
-                    if (len(self._locList) >= 2):
-                        self._spdList = np.concatenate((self._spdList, np.array([[(self._locList[-1, i] - self._locList[-2, i]) / self._interval for i in range(3)]])))
-                        self._spdMecanumList = np.concatenate((self._spdMecanumList, np.array([Mecanum.resolve(self._spdList[-1, 0], self._spdList[-1, 1], self._spdList[-1, 2], (self._locList[-1, 2] + self._locList[-2, 2]) / 2)])))
-                        self._spdOmniList = np.concatenate((self._spdOmniList, np.array([Omni.resolve(self._spdList[-1, 0], self._spdList[-1, 1], self._spdList[-1, 2], (self._locList[-1, 2] + self._locList[-2, 2]) / 2)])))
-                        if (len(self._locList) >= 3):
-                            self._accList = np.concatenate((self._accList, np.array([[(self._spdList[-1, i] - self._spdList[-2, i]) / self._interval for i in range(3)]])))
-                            self._accMecanumList = np.concatenate((self._accMecanumList, np.array([[(self._spdMecanumList[-1, i] - self._spdMecanumList[-2, i]) / self._interval for i in range(4)]])))
-                            self._accOmniList = np.concatenate((self._accOmniList, np.array([[(self._spdOmniList[-1, i] - self._spdOmniList[-2, i]) / self._interval for i in range(3)]])))
+                    buffer = np.array([[float(data) for data in eachline.split(' ')]])
+                    self._position = np.concatenate((self._position, buffer[:, 0: 3]))
+                    self._goal = np.concatenate((self._goal, buffer[:, 3: 6]))
+                    self._idealSpeed = np.concatenate((self._idealSpeed, buffer[:, 6: 9]))
+                    self._idealSpeedMecanum = np.concatenate((self._idealSpeedMecanum, np.array([Mecanum.resolve(self._idealSpeed[-1, 0], self._idealSpeed[-1, 1], self._idealSpeed[-1, 2], self._goal[-1, 2])])))
+                    self._idealSpeedOmni = np.concatenate((self._idealSpeedOmni, np.array([Omni.resolve(self._idealSpeed[-1, 0], self._idealSpeed[-1, 1], self._idealSpeed[-1, 2], self._goal[-1, 2])])))
+                    if (len(self._position) >= 2):
+                        self._realSpeed = np.concatenate((self._realSpeed, np.array([[(self._position[-1, i] - self._position[-2, i]) / self._interval for i in range(3)]])))
+                        self._realSpeedMecanum = np.concatenate((self._realSpeedMecanum, np.array([Mecanum.resolve(self._realSpeed[-1, 0], self._realSpeed[-1, 1], self._realSpeed[-1, 2], self._position[-1, 2])])))
+                        self._realSpeedOmni = np.concatenate((self._realSpeedOmni, np.array([Omni.resolve(self._realSpeed[-1, 0], self._realSpeed[-1, 1], self._realSpeed[-1, 2], self._position[-1, 2])])))
+                        self._idealAccel = np.concatenate((self._idealAccel, np.array([[(self._idealSpeed[-1, i] - self._idealSpeed[-2, i]) / self._interval for i in range(3)]])))
+                        self._idealAccelMecanum = np.concatenate((self._idealAccelMecanum, np.array([[(self._idealSpeedMecanum[-1, i] - self._idealSpeedMecanum[-2, i]) / self._interval for i in range(4)]])))
+                        self._idealAccelOmni = np.concatenate((self._idealAccelOmni, np.array([[(self._idealSpeedOmni[-1, i] - self._idealSpeedOmni[-2, i]) / self._interval for i in range(3)]])))
+                        if (len(self._position) >= 3):
+                            self._realAccel = np.concatenate((self._realAccel, np.array([[(self._realSpeed[-1, i] - self._realSpeed[-2, i]) / self._interval for i in range(3)]])))
+                            self._realAccelMecanum = np.concatenate((self._realAccelMecanum, np.array([[(self._realSpeedMecanum[-1, i] - self._realSpeedMecanum[-2, i]) / self._interval for i in range(4)]])))
+                            self._realAccelOmni = np.concatenate((self._realAccelOmni, np.array([[(self._realSpeedOmni[-1, i] - self._realSpeedOmni[-2, i]) / self._interval for i in range(3)]])))
         except:
             pass
     
     def __show(self):
-        tSpd = np.arange(len(self._spdList))
-        tAcc = np.arange(len(self._accList))
+        tPos = np.arange(len(self._position))
+        tSpd = np.arange(len(self._realSpeed))
+        tAcc = np.arange(len(self._realAccel))
+        plt.figure(num='场地平面图')
+        plt.plot(self._goal[:, 0], self._goal[:, 1], 'r', self._position[:, 0], self._position[:, 1], 'b')
         plt.figure(num='整车电机曲线')
-        plt.subplot(321); plt.plot(tSpd, self._spdList[:, 0]); plt.ylabel('m/s'); plt.title('X-axis Velocity')
-        plt.subplot(322); plt.plot(tAcc, self._accList[:, 0]); plt.ylabel('m/s^2'); plt.title('X-axis Acceleration')
-        plt.subplot(323); plt.plot(tSpd, self._spdList[:, 1]); plt.ylabel('m/s'); plt.title('Y-axis Velocity')
-        plt.subplot(324); plt.plot(tAcc, self._accList[:, 1]); plt.ylabel('m/s^2'); plt.title('Y-axis Acceleration')
-        plt.subplot(325); plt.plot(tSpd, self._spdList[:, 2]); plt.ylabel('rad/s'); plt.title('Z-axis Velocity')
-        plt.subplot(326); plt.plot(tAcc, self._accList[:, 2]); plt.ylabel('rad/s^2'); plt.title('Z-axis Acceleration')
+        plt.subplot(321); plt.plot(tSpd, self._realSpeed[:, 0]); plt.ylabel('m/s'); plt.title('X-axis Velocity')
+        plt.subplot(322); plt.plot(tAcc, self._realAccel[:, 0]); plt.ylabel('m/s^2'); plt.title('X-axis Acceleration')
+        plt.subplot(323); plt.plot(tSpd, self._realSpeed[:, 1]); plt.ylabel('m/s'); plt.title('Y-axis Velocity')
+        plt.subplot(324); plt.plot(tAcc, self._realAccel[:, 1]); plt.ylabel('m/s^2'); plt.title('Y-axis Acceleration')
+        plt.subplot(325); plt.plot(tSpd, self._realSpeed[:, 2]); plt.ylabel('rad/s'); plt.title('Z-axis Velocity')
+        plt.subplot(326); plt.plot(tAcc, self._realAccel[:, 2]); plt.ylabel('rad/s^2'); plt.title('Z-axis Acceleration')
         plt.figure(num='麦克纳姆轮电机曲线')
-        plt.subplot(421); plt.plot(tSpd, self._spdMecanumList[:, 0]); plt.ylabel('cnt/s'); plt.title('Left Front Velocity')
-        plt.subplot(422); plt.plot(tAcc, self._accMecanumList[:, 0]); plt.ylabel('cnt/s^2'); plt.title('Left Front Acceleration')
-        plt.subplot(423); plt.plot(tSpd, self._spdMecanumList[:, 1]); plt.ylabel('cnt/s'); plt.title('Left Rear Velocity')
-        plt.subplot(424); plt.plot(tAcc, self._accMecanumList[:, 1]); plt.ylabel('cnt/s^2'); plt.title('Left Rear Acceleration')
-        plt.subplot(425); plt.plot(tSpd, self._spdMecanumList[:, 2]); plt.ylabel('cnt/s'); plt.title('Right Rear Velocity')
-        plt.subplot(426); plt.plot(tAcc, self._accMecanumList[:, 2]); plt.ylabel('cnt/s^2'); plt.title('Right Rear Acceleration')
-        plt.subplot(427); plt.plot(tSpd, self._spdMecanumList[:, 3]); plt.ylabel('cnt/s'); plt.title('Right Front Velocity')
-        plt.subplot(428); plt.plot(tAcc, self._accMecanumList[:, 3]); plt.ylabel('cnt/s^2'); plt.title('Right Front Acceleration')
+        plt.subplot(421); plt.plot(tSpd, self._realSpeedMecanum[:, 0]); plt.ylabel('cnt/s'); plt.title('Left Front Velocity')
+        plt.subplot(422); plt.plot(tAcc, self._realAccelMecanum[:, 0]); plt.ylabel('cnt/s^2'); plt.title('Left Front Acceleration')
+        plt.subplot(423); plt.plot(tSpd, self._realSpeedMecanum[:, 1]); plt.ylabel('cnt/s'); plt.title('Left Rear Velocity')
+        plt.subplot(424); plt.plot(tAcc, self._realAccelMecanum[:, 1]); plt.ylabel('cnt/s^2'); plt.title('Left Rear Acceleration')
+        plt.subplot(425); plt.plot(tSpd, self._realSpeedMecanum[:, 2]); plt.ylabel('cnt/s'); plt.title('Right Rear Velocity')
+        plt.subplot(426); plt.plot(tAcc, self._realAccelMecanum[:, 2]); plt.ylabel('cnt/s^2'); plt.title('Right Rear Acceleration')
+        plt.subplot(427); plt.plot(tSpd, self._realSpeedMecanum[:, 3]); plt.ylabel('cnt/s'); plt.title('Right Front Velocity')
+        plt.subplot(428); plt.plot(tAcc, self._realAccelMecanum[:, 3]); plt.ylabel('cnt/s^2'); plt.title('Right Front Acceleration')
         plt.figure(num='全向轮电机曲线')
-        plt.subplot(321); plt.plot(tSpd, self._spdOmniList[:, 0]); plt.ylabel('cnt/s'); plt.title('Head Velocity')
-        plt.subplot(322); plt.plot(tAcc, self._accOmniList[:, 0]); plt.ylabel('cnt/s^2'); plt.title('Head Acceleration')
-        plt.subplot(323); plt.plot(tSpd, self._spdOmniList[:, 1]); plt.ylabel('cnt/s'); plt.title('Left Velocity')
-        plt.subplot(324); plt.plot(tAcc, self._accOmniList[:, 1]); plt.ylabel('cnt/s^2'); plt.title('Left Acceleration')
-        plt.subplot(325); plt.plot(tSpd, self._spdOmniList[:, 2]); plt.ylabel('cnt/s'); plt.title('Right Velocity')
-        plt.subplot(326); plt.plot(tAcc, self._accOmniList[:, 2]); plt.ylabel('cnt/s^2'); plt.title('Right Acceleration')
+        plt.subplot(321); plt.plot(tSpd, self._realSpeedOmni[:, 0]); plt.ylabel('cnt/s'); plt.title('Head Velocity')
+        plt.subplot(322); plt.plot(tAcc, self._realAccelOmni[:, 0]); plt.ylabel('cnt/s^2'); plt.title('Head Acceleration')
+        plt.subplot(323); plt.plot(tSpd, self._realSpeedOmni[:, 1]); plt.ylabel('cnt/s'); plt.title('Left Velocity')
+        plt.subplot(324); plt.plot(tAcc, self._realAccelOmni[:, 1]); plt.ylabel('cnt/s^2'); plt.title('Left Acceleration')
+        plt.subplot(325); plt.plot(tSpd, self._realSpeedOmni[:, 2]); plt.ylabel('cnt/s'); plt.title('Right Velocity')
+        plt.subplot(326); plt.plot(tAcc, self._realAccelOmni[:, 2]); plt.ylabel('cnt/s^2'); plt.title('Right Acceleration')
         plt.show()
 
 if __name__=='__main__':

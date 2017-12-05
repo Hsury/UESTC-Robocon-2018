@@ -20,14 +20,17 @@ class Gyro():
             pass
     
     def __query(self):
-        while self._serial.is_open:
-            self._serial.reset_input_buffer()
-            self._serial.readline()
-            buffer = self._serial.readline().decode()[:-1].split(' ')
-            self._data = [int(buffer[1]) / 1E4, \
-                          int(buffer[2]) / 1E4, \
-                          float(buffer[0]) * pi / 180]
-            self._count += 1
+        while True:
+            try:
+                self._serial.reset_input_buffer()
+                self._serial.readline()
+                buffer = self._serial.readline().decode()[:-1].split(' ')
+                self._data = [int(buffer[1]) / 1E4, \
+                              int(buffer[2]) / 1E4, \
+                              float(buffer[0]) * pi / 180]
+                self._count += 1
+            except:
+                print('Gyro Error')
     
     def test(self):
         from time import sleep
