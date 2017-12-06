@@ -40,12 +40,12 @@ class Dash():
         while self._dist[2] > pi:
             self._dist[2] -= 2 * pi
         # Under Construction
+        _safeDist = 1
         _maxSpd = 3
-        _smplgPd = 0.15
-        _linearCoefP = 0.1
+        _linearCoefP = 1
         _angularCoefP = 1
         self._resDist = sqrt(self._dist[0] ** 2 + self._dist[1] ** 2)
-        if self._resDist > _smplgPd * _maxSpd:
+        if self._resDist > _safeDist:
             self._speed[0] = self._dist[0] * _maxSpd / self._resDist
             self._speed[1] = self._dist[1] * _maxSpd / self._resDist
         else:

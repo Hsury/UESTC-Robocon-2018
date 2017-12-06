@@ -25,7 +25,7 @@ class Spy():
                     fobj.writelines('{} {} {} '.format(self._dash._merge.data[0], self._dash._merge.data[1], self._dash._merge.data[2]))
                     fobj.writelines('{} {} {} '.format(self._dash._goal[0], self._dash._goal[1], self._dash._goal[2]))
                     fobj.writelines('{} {} {}\n'.format(self._dash._speed[0], self._dash._speed[1], self._dash._speed[2]))
-                    time.sleep(0.001)
+                    time.sleep(0.01)
         except:
             pass
 
