@@ -6,7 +6,13 @@ class Dash():
     Dash Package
     '''
     POSITION_MODE = 0
-    SPEED_MODE = 1
+    INCREMENT_MODE = 1
+    SPEED_MODE = 2
+
+    SAFE_DIST = 1
+    MAX_SPEED = 3
+    COEF_LINEAR = 1
+    COEF_ANGULAR = 1
 
     def __init__(self, base, merge):
         self._base = base
@@ -15,6 +21,8 @@ class Dash():
         self._goal = [0] * 3
         self._dist = [0] * 3
         self._speed = [0] * 3
+        self._resDist = 0
+        self._resSpeed = 0
         self.lock()
         sendThd = threading.Thread(target=self.__send)
         sendThd.setDaemon(True)
@@ -24,13 +32,13 @@ class Dash():
         from time import sleep
         while True:
             if not self._lock:
-                if self.mode == Dash.POSITION_MODE:
+                if self.mode == Dash.POSITION_MODE or self.mode == Dash.INCREMENT_MODE:
                     self.__resolve(self._merge.data, self._goal)
                 #self._speed[0] = self.__limiter(self._speed[0], -2, 2)
                 #self._speed[1] = self.__limiter(self._speed[1], -2, 2)
                 #self._speed[2] = self.__limiter(self._speed[2], - pi / 2, pi / 2)
                 self._base.go(self._speed[0], self._speed[1], self._speed[2], self._merge.data[2])
-            sleep(0.005)
+            sleep(0.001)
     
     def __resolve(self, position, goal):
         for idx in range(3):
@@ -39,19 +47,15 @@ class Dash():
             self._dist[2] += 2 * pi
         while self._dist[2] > pi:
             self._dist[2] -= 2 * pi
-        # Under Construction
-        _safeDist = 1
-        _maxSpd = 3
-        _linearCoefP = 1
-        _angularCoefP = 1
         self._resDist = sqrt(self._dist[0] ** 2 + self._dist[1] ** 2)
-        if self._resDist > _safeDist:
-            self._speed[0] = self._dist[0] * _maxSpd / self._resDist
-            self._speed[1] = self._dist[1] * _maxSpd / self._resDist
+        if self._resDist > Dash.SAFE_DIST:
+            self._speed[0] = self._dist[0] * Dash.MAX_SPEED / self._resDist
+            self._speed[1] = self._dist[1] * Dash.MAX_SPEED / self._resDist
         else:
-            self._speed[0] = self._dist[0] * _linearCoefP
-            self._speed[1] = self._dist[1] * _linearCoefP
-        self._speed[2] = self._dist[2] * _angularCoefP
+            self._speed[0] = self._dist[0] * Dash.COEF_LINEAR
+            self._speed[1] = self._dist[1] * Dash.COEF_LINEAR
+        self._resSpeed = sqrt(self._speed[0] ** 2 + self._speed[1] ** 2)
+        self._speed[2] = self._dist[2] * Dash.COEF_ANGULAR
 
     def __limiter(self, value, lower, upper):
         if value < lower:
@@ -73,6 +77,10 @@ class Dash():
     def to(self, x, y, z):
         self._mode = Dash.POSITION_MODE
         self._goal = [x, y, z]
+    
+    def by(self, x, y, z):
+        self._mode = Dash.INCREMENT_MODE
+        self._goal = [self._merge.data[0] + x, self._merge.data[1] + y, self._merge.data[2] + z]
 
     def at(self, x, y, z):
         self._mode = Dash.SPEED_MODE
@@ -101,3 +109,11 @@ class Dash():
     @property
     def speed(self):
         return self._speed
+
+    @property
+    def resDist(self):
+        return self._resDist
+
+    @property
+    def resSpeed(self):
+        return self._resSpeed

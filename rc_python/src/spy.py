@@ -22,9 +22,9 @@ class Spy():
             os.symlink(path + filename, path + 'rc_trace.txt')
             with open(path + filename, 'w') as fobj:
                 while Spy.isSpying:
-                    fobj.writelines('{} {} {} '.format(self._dash._merge.data[0], self._dash._merge.data[1], self._dash._merge.data[2]))
-                    fobj.writelines('{} {} {} '.format(self._dash._goal[0], self._dash._goal[1], self._dash._goal[2]))
-                    fobj.writelines('{} {} {}\n'.format(self._dash._speed[0], self._dash._speed[1], self._dash._speed[2]))
+                    fobj.writelines('{} {} {} '.format(self._dash.position[0], self._dash.position[1], self._dash.position[2]))
+                    fobj.writelines('{} {} {} '.format(self._dash.goal[0], self._dash.goal[1], self._dash.goal[2]))
+                    fobj.writelines('{} {} {}\n'.format(self._dash.speed[0], self._dash.speed[1], self._dash.speed[2]))
                     time.sleep(0.01)
         except:
             pass
