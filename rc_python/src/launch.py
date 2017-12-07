@@ -28,9 +28,13 @@ class Launch():
         if ros:
             from ros import Ros
             Launch.ros = Ros(Launch.dash)
+    
+    def exit(self):
+        Launch.base.stop()
+        Launch.base.disable()
 
 if __name__=='__main__':
     launch = Launch(baseType='mecanum', showEditor=False, showViewer=False, ros=False)
     input('Press [Enter] to exit')
-    Launch.base.stop()
-    Launch.base.disable()
+    launch.exit()
+
