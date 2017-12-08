@@ -4,6 +4,7 @@ from merge import Merge
 from dash import Dash
 from feed import Feed
 from remote import Remote
+from spy import Spy
 
 class Launch():
     '''UESTC 2018 Robocon Team
@@ -11,18 +12,16 @@ class Launch():
     '''
     isLaunched = False
 
-    def __init__(self, baseType='mecanum', showEditor=False, showViewer=False, ros=False):
+    def __init__(self, baseType='mecanum', viewer=False, ros=False):
         if not Launch.isLaunched:
             Launch.base = Mecanum() if baseType == 'mecanum' else Omni()
             Launch.merge = Merge()
             Launch.dash = Dash(Launch.base, Launch.merge)
             Launch.feed = Feed(Launch.dash)
             Launch.remote = Remote(Launch.dash, Launch.feed)
+            Launch.spy = Spy(Launch.dash)
             Launch.isLaunched = True
-        if showEditor:
-            from editor import Editor
-            Launch.editor = Editor()
-        if showViewer:
+        if viewer:
             from viewer import Viewer
             Launch.viewer = Viewer(Launch.dash)
         if ros:
@@ -32,9 +31,10 @@ class Launch():
     def exit(self):
         Launch.base.stop()
         Launch.base.disable()
+        Launch.isLaunched = False
 
 if __name__=='__main__':
-    launch = Launch(baseType='mecanum', showEditor=False, showViewer=False, ros=False)
+    launch = Launch(baseType='mecanum', viewer=False, ros=False)
     input('Press [Enter] to exit')
     launch.exit()
 
