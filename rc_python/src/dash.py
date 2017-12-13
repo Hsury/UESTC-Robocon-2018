@@ -97,7 +97,7 @@ class Dash():
     
     def cuiTo(self, x, y, z):
         self._mode = Dash.TEST_MODE
-        self._cuiDash.setGoal(x, y, z)
+        #self._cuiDash.setGoal(x, y, z)
     
     @property
     def locked(self):

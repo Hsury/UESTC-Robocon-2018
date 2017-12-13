@@ -17,10 +17,10 @@ class Wrapper():
         # self.RouteControlInit.end_point.x = input('Target Point X = ')
         # self.RouteControlInit.end_point.y = input('Target Point Y = ')
         # self.RouteControlInit.end_point.ang = input('Target Point ANG = ')
-        #self.RouteControlInit.route_type = -1
-        #self.RouteControlInit.end_point.x = 6000
-        #self.RouteControlInit.end_point.y = 0
-        #self.RouteControlInit.end_point.ang = 0
+        self.RouteControlInit.route_type = -1
+        self.RouteControlInit.end_point.x = 6000
+        self.RouteControlInit.end_point.y = 0
+        self.RouteControlInit.end_point.ang = 0
         print('------------------Set Route Speed -------------------')
         # self.RouteControlInit.forward_init.unif_v = input("Route Uinf V = ")
         # self.RouteControlInit.forward_init.end_v = input("Route End V = ")
