@@ -72,7 +72,6 @@ class Dash():
     
     def lock(self):
         self._lock = True
-        self._goal = self._merge.data[:]
         self._speed = [0] * 3
         self._base.stop()
     
