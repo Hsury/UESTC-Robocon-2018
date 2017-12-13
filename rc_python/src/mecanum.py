@@ -5,9 +5,9 @@ class Mecanum():
     '''UESTC 2018 Robocon Team
     Mecanum Driver Package
     '''
-    WHEEL_RADIUS = 0.078
-    SIDE_LENGTH = 1.01
-    REDUCTION_RATIO = 1
+    WHEEL_RADIUS = 0.075
+    SIDE_LENGTH = 0.75
+    REDUCTION_RATIO = 11.39 / 5
 
     def __init__(self, leftFrontPort='/dev/elmo0', leftRearPort='/dev/elmo1', rightFrontPort='/dev/elmo2', rightRearPort='/dev/elmo3', baudrate=19200):
         self._port = [leftFrontPort, leftRearPort, rightFrontPort, rightRearPort]

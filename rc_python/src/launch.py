@@ -3,6 +3,7 @@ from omni import Omni
 from merge import Merge
 from dash import Dash
 from feed import Feed
+from flow import Flow
 from remote import Remote
 from spy import Spy
 
@@ -12,12 +13,13 @@ class Launch():
     '''
     isLaunched = False
 
-    def __init__(self, baseType='mecanum', viewer=False, ros=False):
+    def __init__(self, baseType='mecanum', debug=True, viewer=False, ros=False):
         if not Launch.isLaunched:
             Launch.base = Mecanum() if baseType == 'mecanum' else Omni()
             Launch.merge = Merge()
             Launch.dash = Dash(Launch.base, Launch.merge)
             Launch.feed = Feed(Launch.dash)
+            Launch.flow = Flow(Launch.dash, debug=debug)
             Launch.remote = Remote(Launch.dash, Launch.feed)
             Launch.spy = Spy(Launch.dash)
             Launch.isLaunched = True
@@ -34,7 +36,7 @@ class Launch():
         Launch.isLaunched = False
 
 if __name__=='__main__':
-    launch = Launch(baseType='mecanum', viewer=False, ros=False)
+    launch = Launch(baseType='mecanum', debug=True, viewer=False, ros=False)
     input('Press [Enter] to exit')
     launch.exit()
 
