@@ -12,8 +12,8 @@ class Dash():
 
     SAFE_DIST = 0.25
     MAX_SPEED = 1.5
-    COEF_LINEAR = 2
-    COEF_ANGULAR = 2
+    COEF_LINEAR = 5
+    COEF_ANGULAR = 2.5
 
     def __init__(self, base, merge):
         self._base = base

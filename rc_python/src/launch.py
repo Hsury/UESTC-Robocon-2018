@@ -13,7 +13,7 @@ class Launch():
     '''
     isLaunched = False
 
-    def __init__(self, baseType='mecanum', debug=True, viewer=False, ros=False):
+    def __init__(self, baseType='mecanum', debug=True, record=True, viewer=False, ros=False):
         if not Launch.isLaunched:
             Launch.base = Mecanum() if baseType == 'mecanum' else Omni()
             Launch.merge = Merge()
@@ -23,6 +23,9 @@ class Launch():
             Launch.remote = Remote(Launch.dash, Launch.feed)
             Launch.spy = Spy(Launch.dash)
             Launch.isLaunched = True
+        Launch.base.enable()
+        if record:
+            Launch.spy.begin()
         if viewer:
             from viewer import Viewer
             Launch.viewer = Viewer(Launch.dash)
@@ -31,12 +34,10 @@ class Launch():
             Launch.ros = Ros(Launch.dash)
     
     def exit(self):
-        Launch.base.stop()
         Launch.base.disable()
-        Launch.isLaunched = False
+        Launch.spy.stop()
 
 if __name__=='__main__':
-    launch = Launch(baseType='mecanum', debug=True, viewer=False, ros=False)
+    launch = Launch(baseType='mecanum', debug=True, record=True, viewer=False, ros=False)
     input('Press [Enter] to exit')
     launch.exit()
-
