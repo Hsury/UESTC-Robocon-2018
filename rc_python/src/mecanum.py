@@ -7,7 +7,7 @@ class Mecanum():
     '''
     WHEEL_RADIUS = 0.075
     SIDE_LENGTH = 0.75
-    REDUCTION_RATIO = 11.39 / 5
+    REDUCTION_RATIO = 11.39
 
     def __init__(self, leftFrontPort='/dev/elmo0', leftRearPort='/dev/elmo1', rightFrontPort='/dev/elmo2', rightRearPort='/dev/elmo3', baudrate=19200):
         self._port = [leftFrontPort, leftRearPort, rightFrontPort, rightRearPort]
@@ -49,7 +49,7 @@ class Mecanum():
                 - v2jv((vX * cos(pi / 4 - orient) - vY * sin(pi / 4 - orient) - w2v(wZ)) * sqrt(2))]
     
     def go(self, vX=0, vY=0, wZ=0, orient=0):
-        self._speedList = self.resolve(vX, vY, wZ, orient)
+        self._speedList = self.resolve(vX, vY, wZ, orient + pi)
         for idx in range(4):
             self._elmoList[idx].speed = self._speedList[idx]
         for idx in range(4):
