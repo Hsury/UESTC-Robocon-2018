@@ -81,10 +81,12 @@ class Dash():
     def to(self, x, y, z):
         self._mode = Dash.POSITION_MODE
         self._goal = [x, y, z]
+        self.__resolve(self._merge.data, self._goal)
     
     def by(self, x, y, z):
         self._mode = Dash.INCREMENT_MODE
         self._goal = [self._merge.data[0] + x, self._merge.data[1] + y, self._merge.data[2] + z]
+        self.__resolve(self._merge.data, self._goal)
 
     def at(self, x, y, z):
         self._mode = Dash.SPEED_MODE
