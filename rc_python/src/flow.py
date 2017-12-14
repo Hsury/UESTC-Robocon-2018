@@ -102,7 +102,7 @@ class Flow():
 
     # ID 2, From ARSZ To TZA
     def __ARSZ2TZA(self):
-        self._dash.to(1.625, 3.055, 0)
+        self._dash.to(1.425, 3.055, 0)
         self._dash.unlock()
         while self._dash.resDist >= 0.2:
             sleep(0.005)
@@ -126,7 +126,7 @@ class Flow():
 
     # ID 5, From TZ1 To TZA
     def __TZ12TZA(self):
-        self._dash.to(1.625, 3.055, 0)
+        self._dash.to(1.425, 3.055, 0)
         while self._dash.resDist >= 0.2:
             sleep(0.005)
         print('Arrive with resultant distance: {}'.format(self._dash.resDist))
@@ -134,7 +134,7 @@ class Flow():
 
     # ID 6, From TZA To TZB
     def __TZA2TZB(self):
-        self._dash.to(1.625, 1.035, 0)
+        self._dash.to(1.425, 1.035, 0)
         while self._dash.resDist >= 0.2:
             sleep(0.005)
         print('Arrive with resultant distance: {}'.format(self._dash.resDist))
@@ -172,7 +172,7 @@ class Flow():
 
     # ID 11, From TZ3 To ARSZ
     def __TZ32ARSZ(self):
-        self._dash.to(1.625, 1.035, 0)
+        self._dash.to(1.425, 1.035, 0)
         while self._dash.resDist >= 0.2:
             sleep(0.005)
         self._dash.to(0.55, 7.54, 0)
