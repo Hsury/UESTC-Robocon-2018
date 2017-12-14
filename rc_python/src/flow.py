@@ -162,12 +162,11 @@ class Flow():
     # ID 11, From TZ3 To ARSZ
     def __TZ32ARSZ(self):
         self._dash.to(1.425, 1.035, 0)
-        while self._dash.resDist >= 0.2:
+        while self._dash.resDist >= 0.1:
             sleep(0.01)
-        sleep(1)
-        self._dash.to(0.55, 7.54, 0)
-        while self._dash.resDist >= 0.05:
+        self._dash.to(0.65, 7.44, 0)
+        while self._dash.resDist >= 0.1:
             sleep(0.01)
-        sleep(5)
+        sleep(2)
         self._dash.lock()
         return None
