@@ -31,7 +31,7 @@ class Remote():
             try:
                 recvBuffer = conn.recv(1024)
                 if recvBuffer:
-                    recvJson = json.loads(recvBuffer)
+                    recvJson = json.loads(recvBuffer.decode())
                     for cmd in recvJson:
                         eval(cmd)
                     sendBuffer = {'dist': self._dash.dist,

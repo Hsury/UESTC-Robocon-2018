@@ -8,7 +8,7 @@ class Wrapper():
         self.RouteControlInit = swig_control.RouteControlInit_t()
     
     def setPosition(self, x, y, z):
-        self.globalParam.updateGlobalParam(x, y, z, 0)
+        self.globalParam.updateGlobalParam(int(x * 1000), int(y * 1000), z, 0)
     
     def setGoal(self, x, y, z, typeNum=0):
         print('------------------Set Route Target -------------------')
@@ -17,8 +17,8 @@ class Wrapper():
         # self.RouteControlInit.end_point.y = input('Target Point Y = ')
         # self.RouteControlInit.end_point.ang = input('Target Point ANG = ')
         self.RouteControlInit.route_type = typeNum
-        self.RouteControlInit.end_point.x = x * 1000
-        self.RouteControlInit.end_point.y = y * 1000
+        self.RouteControlInit.end_point.x = int(x * 1000)
+        self.RouteControlInit.end_point.y = int(y * 1000)
         self.RouteControlInit.end_point.ang = z
         print('------------------Set Route Speed -------------------')
         # self.RouteControlInit.forward_init.unif_v = input("Route Uinf V = ")

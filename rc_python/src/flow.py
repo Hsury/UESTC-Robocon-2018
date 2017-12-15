@@ -61,14 +61,13 @@ class Flow():
         self._dash = dash
         self._debug = debug
         self._permission = True
-        self._entrance = None
+        self._entrance = 'Self Test'
+        sleep(1)
         thd = threading.Thread(target=self.__brain)
         thd.setDaemon(True)
         thd.start()
     
     def __brain(self):
-        sleep(1)
-        self._entrance = 'Self Test'
         while self._entrance != None:
             if self._debug:
                 self._permission = False

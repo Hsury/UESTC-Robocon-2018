@@ -18,7 +18,7 @@ class Dash():
     def __init__(self, base, merge):
         self._base = base
         self._merge = merge
-        self._mode = Dash.POSITION_MODE
+        self._mode = Dash.SPEED_MODE
         self._goal = [0] * 3
         self._dist = [0] * 3
         self._speed = [0] * 3
@@ -43,7 +43,7 @@ class Dash():
                 #self._speed[1] = self.__limiter(self._speed[1], -2, 2)
                 #self._speed[2] = self.__limiter(self._speed[2], - pi / 2, pi / 2)
                 self._base.go(self._speed[0], self._speed[1], self._speed[2], self._merge.data[2])
-            sleep(0.001)
+            sleep(0.01)
     
     def __resolve(self, position, goal):
         for idx in range(3):
