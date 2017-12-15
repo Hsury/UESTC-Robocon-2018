@@ -67,53 +67,48 @@ class Flow():
         thd.start()
     
     def __brain(self):
+        sleep(1)
         self._entrance = 'Self Test'
         while self._entrance != None:
             if self._debug:
                 self._permission = False
                 while not self._permission:
                     sleep(0.005)
-            print('========== ID {}, {} =========='.format(self._route[self._entrance]['id'], self._entrance))
             self._entrance = self._route[self._entrance]['func']()
     
     def go(self):
         self._permission = True
     
     @property
-    def busy(self):
-        return self._permission
-
-    @property
-    def info(self):
-        return {'id': self._route[self._entrance]['id'],
+    def status(self):
+        return {'busy': self._permission,
+                'id': self._route[self._entrance]['id'],
                 'task': self._entrance}
     
     # ID 0, Self Test
     def __selfTest(self):
         self._dash.lock()
-        print('Initial position: {}'.format(self._dash.position))
         return 'Param Init'
 
     # ID 1, Param Init
     def __paramInit(self):
         self._dash._merge.swift(0.55, 7.54)
         sleep(0.1)
-        print('Current position: {}'.format(self._dash.position))
         return 'From ARSZ To TZA'
 
     # ID 2, From ARSZ To TZA
     def __ARSZ2TZA(self):
         self._dash.to(1.525, 3.555, 0)
         self._dash.unlock()
-        while self._dash.resDist >= 0.1:
-            sleep(0.01)
+        while self._dash.resDist >= 0.05:
+            sleep(0.005)
         return 'From TZA To TZ1'
 
     # ID 3, From TZA To TZ1
     def __TZA2TZ1(self):
         self._dash.to(3.775, 3.055, 0)
         while self._dash.resDist >= 0.05:
-            sleep(0.01)
+            sleep(0.005)
         return 'Wait For Ball At TZ1'
 
     # ID 4, Wait For Ball At TZ1
@@ -124,22 +119,22 @@ class Flow():
     # ID 5, From TZ1 To TZA
     def __TZ12TZA(self):
         self._dash.to(1.425, 3.055, 0)
-        while self._dash.resDist >= 0.1:
-            sleep(0.01)
+        while self._dash.resDist >= 0.05:
+            sleep(0.005)
         return 'From TZA To TZB'
 
     # ID 6, From TZA To TZB
     def __TZA2TZB(self):
         self._dash.to(1.425, 1.535, 0)
-        while self._dash.resDist >= 0.1:
-            sleep(0.01)
+        while self._dash.resDist >= 0.05:
+            sleep(0.005)
         return 'From TZB To TZ2'
 
     # ID 7, From TZB To TZ2
     def __TZB2TZ2(self):
         self._dash.to(3.775, 1.035, 0)
         while self._dash.resDist >= 0.05:
-            sleep(0.01)
+            sleep(0.005)
         return 'Wait For Ball At TZ2'
 
     # ID 8, Wait For Ball At TZ2
@@ -151,7 +146,7 @@ class Flow():
     def __TZ22TZ3(self):
         self._dash.to(7.035, 1.035, 0)
         while self._dash.resDist >= 0.05:
-            sleep(0.01)
+            sleep(0.005)
         return 'Wait For Ball At TZ3'
 
     # ID 10, Wait For Ball At TZ3
@@ -162,11 +157,11 @@ class Flow():
     # ID 11, From TZ3 To ARSZ
     def __TZ32ARSZ(self):
         self._dash.to(1.625, 1.035, 0)
-        while self._dash.resDist >= 0.1:
-            sleep(0.01)
+        while self._dash.resDist >= 0.05:
+            sleep(0.005)
         self._dash.to(0.65, 7.44, 0)
-        while self._dash.resDist >= 0.1:
-            sleep(0.01)
+        while self._dash.resDist >= 0.05:
+            sleep(0.005)
         sleep(2)
         self._dash.lock()
         return None

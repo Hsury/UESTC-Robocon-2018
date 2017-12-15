@@ -37,7 +37,7 @@ class Dash():
                     self.__resolve(self._merge.data, self._goal)
                 #Cui's Dash Mode
                 if self.mode == Dash.TEST_MODE:
-                    self._cuiDash.update(self._merge.data[0], self._merge.data[1], self._merge.data[2])
+                    self._cuiDash.setPosition(self._merge.data[0], self._merge.data[1], self._merge.data[2])
                     self._speed = self._cuiDash.resolve()
                 #self._speed[0] = self.__limiter(self._speed[0], -2, 2)
                 #self._speed[1] = self.__limiter(self._speed[1], -2, 2)
@@ -96,9 +96,10 @@ class Dash():
         from cuiDash.wrapper import Wrapper
         self._cuiDash = Wrapper()
     
-    def cuiTo(self, x, y, z):
+    def cuiTo(self, x, y, z, typeNum=0):
         self._mode = Dash.TEST_MODE
-        #self._cuiDash.setGoal(x, y, z)
+        self._cuiDash.setPosition(self._merge.data[0], self._merge.data[1], self._merge.data[2])
+        self._cuiDash.setGoal(x, y, z, typeNum)
     
     @property
     def locked(self):

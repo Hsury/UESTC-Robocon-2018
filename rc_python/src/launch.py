@@ -20,7 +20,7 @@ class Launch():
             Launch.dash = Dash(Launch.base, Launch.merge)
             Launch.feed = Feed(Launch.dash)
             Launch.flow = Flow(Launch.dash, debug=debug)
-            Launch.remote = Remote(Launch.dash, Launch.feed)
+            Launch.remote = Remote(Launch.dash, Launch.flow)
             Launch.spy = Spy(Launch.dash)
             Launch.isLaunched = True
         Launch.base.enable()

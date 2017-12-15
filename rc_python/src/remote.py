@@ -6,9 +6,9 @@ class Remote():
     '''UESTC 2018 Robocon Team
     Remote Package
     '''
-    def __init__(self, dash, feed, port=2018):
+    def __init__(self, dash, flow, port=2018):
         self._dash = dash
-        self._feed = feed
+        self._flow = flow
         self._s = socket(AF_INET, SOCK_STREAM)
         self._s.bind(('0.0.0.0', port))
         self._s.listen()
@@ -34,12 +34,14 @@ class Remote():
                     recvJson = json.loads(recvBuffer)
                     for cmd in recvJson:
                         eval(cmd)
-                    sendBuffer = {'dash_dist': self._dash.dist,
-                                  'dash_goal': self._dash.goal,
-                                  'dash_locked': self._dash.locked,
-                                  'dash_position': self._dash.position,
-                                  'dash_speed': self._dash.speed,
-                                  'feed_status': self._feed.status}
+                    sendBuffer = {'dist': self._dash.dist,
+                                  'goal': self._dash.goal,
+                                  'locked': self._dash.locked,
+                                  'position': self._dash.position,
+                                  'speed': self._dash.speed,
+                                  'flow_busy': self._flow.status['busy'],
+                                  'flow_id': self._flow.status['id'],
+                                  'flow_task': self._flow.status['task']}
                     conn.send(json.dumps(sendBuffer).encode())
             except BlockingIOError:
                 pass
