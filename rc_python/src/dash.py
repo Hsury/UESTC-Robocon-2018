@@ -11,7 +11,7 @@ class Dash():
     TEST_MODE = 3
 
     SAFE_DIST = 0.25
-    MAX_SPEED = 1.5
+    MAX_SPEED = 2
     COEF_LINEAR = 5
     COEF_ANGULAR = 2.5
 

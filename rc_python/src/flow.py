@@ -103,7 +103,7 @@ class Flow():
 
     # ID 2, From ARSZ To TZA
     def __ARSZ2TZA(self):
-        self._dash.to(1.425, 3.055, 0)
+        self._dash.to(1.525, 3.555, 0)
         self._dash.unlock()
         while self._dash.resDist >= 0.1:
             sleep(0.01)
@@ -118,7 +118,7 @@ class Flow():
 
     # ID 4, Wait For Ball At TZ1
     def __waitAtTZ1(self):
-        sleep(2)
+        sleep(5)
         return 'From TZ1 To TZA'
 
     # ID 5, From TZ1 To TZA
@@ -130,7 +130,7 @@ class Flow():
 
     # ID 6, From TZA To TZB
     def __TZA2TZB(self):
-        self._dash.to(1.425, 1.035, 0)
+        self._dash.to(1.425, 1.535, 0)
         while self._dash.resDist >= 0.1:
             sleep(0.01)
         return 'From TZB To TZ2'
@@ -144,7 +144,7 @@ class Flow():
 
     # ID 8, Wait For Ball At TZ2
     def __waitAtTZ2(self):
-        sleep(2)
+        sleep(5)
         return 'From TZ2 To TZ3'
 
     # ID 9, From TZ2 To TZ3
@@ -156,12 +156,12 @@ class Flow():
 
     # ID 10, Wait For Ball At TZ3
     def __waitAtTZ3(self):
-        sleep(2)
+        sleep(5)
         return 'From TZ3 To ARSZ'
 
     # ID 11, From TZ3 To ARSZ
     def __TZ32ARSZ(self):
-        self._dash.to(1.425, 1.035, 0)
+        self._dash.to(1.625, 1.035, 0)
         while self._dash.resDist >= 0.1:
             sleep(0.01)
         self._dash.to(0.65, 7.44, 0)
