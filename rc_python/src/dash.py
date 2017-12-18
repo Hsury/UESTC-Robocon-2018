@@ -79,27 +79,27 @@ class Dash():
         self._lock = False
     
     def to(self, x, y, z):
-        self._mode = Dash.POSITION_MODE
         self._goal = [x, y, z]
         self.__resolve(self._merge.data, self._goal)
+        self._mode = Dash.POSITION_MODE
     
     def by(self, x, y, z):
-        self._mode = Dash.INCREMENT_MODE
         self._goal = [self._merge.data[0] + x, self._merge.data[1] + y, self._merge.data[2] + z]
         self.__resolve(self._merge.data, self._goal)
+        self._mode = Dash.INCREMENT_MODE
 
     def at(self, x, y, z):
-        self._mode = Dash.SPEED_MODE
         self._speed = [x, y, z]
+        self._mode = Dash.SPEED_MODE
     
     def cuiInit(self):
         from cuiDash.wrapper import Wrapper
         self._cuiDash = Wrapper()
     
     def cuiTo(self, x, y, z, typeNum=0):
-        self._mode = Dash.TEST_MODE
         self._cuiDash.setPosition(self._merge.data[0], self._merge.data[1], self._merge.data[2])
         self._cuiDash.setGoal(x, y, z, typeNum)
+        self._mode = Dash.TEST_MODE
     
     @property
     def locked(self):

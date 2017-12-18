@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <WiFi.h>
 #include <SPI.h>
 #include <ArduinoJson.h>
@@ -10,19 +11,42 @@
 #include "bitmap/robocon.h"
 #include "bitmap/frame.h"
 
+#define BUZZER 22
+
 #define TFT_CS -1
-#define TFT_DC 16
-#define TFT_RST 5
+#define TFT_DC 2
+#define TFT_RST 15
+
+#define JOY_AX 32
+#define JOY_AY 33
+#define JOY_BX 34
+#define JOY_BY 35
+
+#define KEY1 25
+#define KEY2 26
+#define KEY3 27
+#define KEY4 14
+#define KEY5 13
+#define KEY6 5
+#define KEY7 4
+#define KEY8 19
+#define KEY9 21
+#define KEY10 39
+#define KEY11 36
 
 #define ROBOT 1
 #define WIRELESS 1
 #define BAUDRATE 115200
 
-const char* ssid = "Mecanum";
-const char* password = "duoguanriben8";
-const char* host = "192.168.2.100";
+#define GOAL_MODE 0
+#define SPEED_MODE 1
+
+const char* ssid = "HsuRY";
+const char* password = "***REMOVED***";
+const char* host = "192.168.1.233";
 const int tcpPort = 2018;
 
+HardwareSerial Serial1(2);
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
 WiFiClient client;
 
@@ -38,67 +62,46 @@ boolean flow_busy;
 int flow_id;
 String flow_task;
 int pixelToDraw[2];
+int mode;
 
-void alignCenterPrint(String text, int16_t x, int16_t y) {
-    int16_t x0, y0;
-    x0 = tft.getCursorX();
-    y0 = tft.getCursorY();
-    int16_t x1, y1;
-    uint16_t w, h;
-    tft.getTextBounds((char *)text.c_str(), 0, 0, &x1, &y1, &w, &h);
-    tft.setCursor(x - w / 2, y - h / 2);
-    tft.print(text);
-    tft.setCursor(x0, y0);
-}
+String cmd;
 
-void conn() {
-    tft.fillScreen(ILI9341_WHITE);
-    tft.drawRGBBitmap((320 - ROBOCON_WIDTH) / 2, (240 - ROBOCON_HEIGHT) / 2, robocon, ROBOCON_WIDTH, ROBOCON_HEIGHT); // Display Robocon 2018 LOGO
-    tft.setCursor(0, 0);
-    tft.print(F("Robot: "));
-    if (ROBOT == 0) tft.println(F("Manual"));
-    else if (ROBOT == 1) tft.println(F("Automatical"));
-    tft.print(F("Mode: "));
-    if (WIRELESS == 0) {
-        tft.println(F("Wire"));
-        tft.print(F("Baudrate: "));
-        tft.println(BAUDRATE);
-        tft.setFont(&msyh10pt7b);
-        alignCenterPrint("Waiting for ACK", 160, 210);
-        tft.setFont();
-    } else if (WIRELESS == 1) {
-        tft.println(F("Wireless"));
-        tft.print(F("SSID: "));
-        tft.println(ssid);
-        tft.print(F("Password: "));
-        tft.println(password);
-        tft.setFont(&msyh10pt7b);
-        alignCenterPrint("Connecting to Wi-Fi", 160, 210);
-        tft.setFont();
-        WiFi.mode(WIFI_STA);
-        WiFi.begin(ssid, password);
-        while (WiFi.status() != WL_CONNECTED) delay(50);
-        tft.print(F("Client IP: "));
-        tft.println(WiFi.localIP());
-        tft.print(F("Server IP: "));
-        tft.println(host);
-        tft.print(F("Server Port: "));
-        tft.println(tcpPort);
-        tft.fillRect(67, 185, 188, 21, ILI9341_WHITE);
-        tft.setFont(&msyh10pt7b);
-        alignCenterPrint("Connecting to TCP Server", 160, 210);
-        tft.setFont();
-        client.connect(host, tcpPort);
-        while (!client.connected()) {
-            client.connect(host, tcpPort);
-            delay(50);
-        }
-        tcpReady = true;
-    }
-}
+void alignCenterPrint(String text, int16_t x, int16_t y);
+void conn();
+void KEY1_ISR();
+void KEY2_ISR();
+void KEY3_ISR();
+void KEY4_ISR();
+void KEY5_ISR();
+void KEY6_ISR();
+void KEY7_ISR();
+void KEY8_ISR();
+void KEY9_ISR();
+void KEY10_ISR();
+void KEY11_ISR();
 
 void setup() {
+    pinMode(BUZZER, OUTPUT);
+    pinMode(JOY_AX, INPUT_PULLUP);
+    pinMode(JOY_AY, INPUT_PULLUP);
+    pinMode(JOY_BX, INPUT_PULLUP);
+    pinMode(JOY_BY, INPUT_PULLUP);
+    pinMode(KEY1, INPUT_PULLUP);
+    pinMode(KEY2, INPUT_PULLUP);
+    pinMode(KEY3, INPUT_PULLUP);
+    pinMode(KEY4, INPUT_PULLUP);
+    pinMode(KEY5, INPUT_PULLUP);
+    pinMode(KEY6, INPUT_PULLUP);
+    pinMode(KEY7, INPUT_PULLUP);
+    pinMode(KEY8, INPUT_PULLUP);
+    pinMode(KEY9, INPUT_PULLUP);
+    pinMode(KEY10, INPUT_PULLUP);
+    pinMode(KEY11, INPUT_PULLUP);
+    digitalWrite(BUZZER, HIGH);
+    delay(50);
+    digitalWrite(BUZZER, LOW);
     Serial.begin(BAUDRATE);
+    Serial1.begin(BAUDRATE);
     tft.begin();
     tft.setRotation(1);
     tft.setTextColor(ILI9341_BLACK);
@@ -110,6 +113,19 @@ void setup() {
     // Draw frame
     tft.fillScreen(ILI9341_WHITE);
     tft.drawRGBBitmap(0, 0, frame, FRAME_WIDTH, FRAME_HEIGHT);
+    attachInterrupt(digitalPinToInterrupt(KEY1), KEY1_ISR, FALLING);
+    attachInterrupt(digitalPinToInterrupt(KEY2), KEY2_ISR, FALLING);
+    attachInterrupt(digitalPinToInterrupt(KEY3), KEY3_ISR, FALLING);
+    attachInterrupt(digitalPinToInterrupt(KEY4), KEY4_ISR, FALLING);
+    attachInterrupt(digitalPinToInterrupt(KEY5), KEY5_ISR, FALLING);
+    attachInterrupt(digitalPinToInterrupt(KEY6), KEY6_ISR, FALLING);
+    attachInterrupt(digitalPinToInterrupt(KEY7), KEY7_ISR, FALLING);
+    attachInterrupt(digitalPinToInterrupt(KEY8), KEY8_ISR, FALLING);
+    attachInterrupt(digitalPinToInterrupt(KEY9), KEY9_ISR, CHANGE);
+    //attachInterrupt(digitalPinToInterrupt(KEY10), KEY10_ISR, FALLING);
+    //attachInterrupt(digitalPinToInterrupt(KEY11), KEY11_ISR, FALLING);
+    if (digitalRead(KEY9) == LOW) mode = SPEED_MODE;
+    else mode = GOAL_MODE;
 }
 
 void loop() {
@@ -125,7 +141,26 @@ void loop() {
     DynamicJsonBuffer jsonBuffer;
     if (tcpReady) {
         JsonArray& json = jsonBuffer.createArray();
-        //json.add("print('Hello, world!')");
+        if (cmd.length() != 0) {
+            json.add(cmd);
+            cmd = "";
+        }
+        if (mode == SPEED_MODE) {
+            double velX = - (1.0 * analogRead(JOY_AX) / 4096 * 4 - 2);
+            if (fabs(velX) < 0.3) velX = 0;
+            double velY = 1.0 * analogRead(JOY_AY) / 4096 * 4 - 2;
+            if (fabs(velY) < 0.3) velY = 0;
+            double velZ = - (1.0 * analogRead(JOY_BX) / 4096 * PI - PI / 2);
+            if (fabs(velZ) < 0.3) velZ = 0;
+            String velStr = "self._dash.at(";
+            velStr.concat(String(velX, 4));
+            velStr.concat(", ");
+            velStr.concat(String(velY, 4));
+            velStr.concat(", ");
+            velStr.concat(String(velZ, 4));
+            velStr.concat(')');
+            json.add(velStr);
+        }
         char buffer[512];
         json.printTo(buffer, sizeof(buffer));
         client.print(buffer);
@@ -155,7 +190,7 @@ void loop() {
         }
     }
     // Time to refresh TFT
-    if (millis() - refreshTS > 100) {
+    if (millis() - refreshTS > 50) {
         // Print lock status
         tft.setFont(&msyh10pt7b);
         tft.setTextColor(ILI9341_WHITE);
@@ -236,4 +271,126 @@ void loop() {
     }
     delay(10); // Make FPS around 100
     fps = 1E6 / (micros() - fpsTS);
+}
+
+void KEY1_ISR() {
+    delayMicroseconds(5E3);
+    if (digitalRead(KEY1) == LOW) cmd = "self._dash._base.enable()";
+}
+
+void KEY2_ISR() {
+    delayMicroseconds(5E3);
+    if (digitalRead(KEY2) == LOW) cmd = "self._dash.lock()";
+}
+
+void KEY3_ISR() {
+    delayMicroseconds(5E3);
+    if (digitalRead(KEY3) == LOW) cmd = "self._dash.unlock()";
+}
+
+void KEY4_ISR() {
+    delayMicroseconds(5E3);
+    if (digitalRead(KEY4) == LOW) cmd = "self._dash._base.disable()";
+}
+
+void KEY5_ISR() {
+    delayMicroseconds(5E3);
+    if (digitalRead(KEY5) == LOW) cmd = "self._flow.go()";
+}
+
+void KEY6_ISR() {
+    delayMicroseconds(5E3);
+    if (digitalRead(KEY4) == LOW) cmd = "print('Key6 Pressed')";
+}
+
+void KEY7_ISR() {
+    delayMicroseconds(5E3);
+    if (digitalRead(KEY4) == LOW) cmd = "print('Key7 Pressed')";
+}
+
+void KEY8_ISR() {
+    delayMicroseconds(5E3);
+    if (digitalRead(KEY4) == LOW) cmd = "print('Key8 Pressed')";
+}
+
+void KEY9_ISR() {
+    delayMicroseconds(5E3);
+    if (digitalRead(KEY9) == LOW) mode = SPEED_MODE;
+    else mode = GOAL_MODE;
+}
+
+void KEY10_ISR() {
+    delayMicroseconds(5E3);
+    if (digitalRead(KEY4) == LOW) cmd = "print('Key10 Pressed')";
+}
+
+void KEY11_ISR() {
+    delayMicroseconds(5E3);
+    if (digitalRead(KEY4) == LOW) cmd = "print('Key11 Pressed')";
+}
+
+void alignCenterPrint(String text, int16_t x, int16_t y) {
+    int16_t x0, y0;
+    x0 = tft.getCursorX();
+    y0 = tft.getCursorY();
+    int16_t x1, y1;
+    uint16_t w, h;
+    tft.getTextBounds((char *)text.c_str(), 0, 0, &x1, &y1, &w, &h);
+    tft.setCursor(x - w / 2, y - h / 2);
+    tft.print(text);
+    tft.setCursor(x0, y0);
+}
+
+void conn() {
+    tft.fillScreen(ILI9341_WHITE);
+    tft.drawRGBBitmap((320 - ROBOCON_WIDTH) / 2, (240 - ROBOCON_HEIGHT) / 2, robocon, ROBOCON_WIDTH, ROBOCON_HEIGHT); // Display Robocon 2018 LOGO
+    tft.setCursor(0, 0);
+    tft.print(F("Robot: "));
+    if (ROBOT == 0) tft.println(F("Manual"));
+    else if (ROBOT == 1) tft.println(F("Automatical"));
+    tft.print(F("Mode: "));
+    if (WIRELESS == 0) {
+        tft.println(F("Wire"));
+        tft.print(F("Baudrate: "));
+        tft.println(BAUDRATE);
+        tft.setFont(&msyh10pt7b);
+        alignCenterPrint("Waiting for ACK", 160, 210);
+        tft.setFont();
+    } else if (WIRELESS == 1) {
+        tft.println(F("Wireless"));
+        tft.print(F("SSID: "));
+        tft.println(ssid);
+        tft.print(F("Password: "));
+        tft.println(password);
+        tft.setFont(&msyh10pt7b);
+        alignCenterPrint("Connecting to Wi-Fi", 160, 210);
+        tft.setFont();
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(ssid, password);
+        while (WiFi.status() != WL_CONNECTED) delay(50);
+        digitalWrite(BUZZER, HIGH);
+        delay(25);
+        digitalWrite(BUZZER, LOW);
+        delay(50);
+        tft.print(F("Client IP: "));
+        tft.println(WiFi.localIP());
+        tft.print(F("Server IP: "));
+        tft.println(host);
+        tft.print(F("Server Port: "));
+        tft.println(tcpPort);
+        tft.fillRect(67, 185, 188, 21, ILI9341_WHITE);
+        tft.setFont(&msyh10pt7b);
+        alignCenterPrint("Connecting to TCP Server", 160, 210);
+        tft.setFont();
+        client.connect(host, tcpPort);
+        while (!client.connected()) {
+            client.connect(host, tcpPort);
+            delay(50);
+        }
+        digitalWrite(BUZZER, HIGH);
+        delay(25);
+        digitalWrite(BUZZER, LOW);
+        delay(50);
+        tcpReady = true;
+    }
 }

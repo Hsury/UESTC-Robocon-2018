@@ -33,7 +33,7 @@ class Remote():
                 if recvBuffer:
                     recvJson = json.loads(recvBuffer.decode())
                     for cmd in recvJson:
-                        eval(cmd)
+                        exec(cmd)
                     sendBuffer = {'dist': self._dash.dist,
                                   'goal': self._dash.goal,
                                   'locked': self._dash.locked,
@@ -44,6 +44,8 @@ class Remote():
                                   'flow_task': self._flow.status['task']}
                     conn.send(json.dumps(sendBuffer).encode())
             except BlockingIOError:
+                pass
+            except json.decoder.JSONDecodeError:
                 pass
             except:
                 break
