@@ -36,6 +36,7 @@ class Launch():
     def exit(self):
         Launch.base.disable()
         Launch.spy.stop()
+        Launch.remote.destroy()
 
 if __name__=='__main__':
     launch = Launch(baseType='mecanum', debug=True, record=True, viewer=False, ros=False)

@@ -51,3 +51,10 @@ class Remote():
                 break
             sleep(0.01)
         self._dash.lock()
+    
+    def destroy(self):
+        try:
+            self._s.shutdown(SHUT_RDWR)
+            self._s.close()
+        except:
+            pass

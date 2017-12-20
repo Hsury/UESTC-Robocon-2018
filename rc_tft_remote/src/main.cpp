@@ -41,9 +41,9 @@
 #define GOAL_MODE 0
 #define SPEED_MODE 1
 
-const char* ssid = "HsuRY";
-const char* password = "***REMOVED***";
-const char* host = "192.168.1.233";
+const char* ssid = "Mecanum";
+const char* password = "duoguanriben8";
+const char* host = "192.168.3.100";
 const int tcpPort = 2018;
 
 HardwareSerial Serial1(2);
@@ -146,11 +146,11 @@ void loop() {
             cmd = "";
         }
         if (mode == SPEED_MODE) {
-            double velX = - (1.0 * analogRead(JOY_AX) / 4096 * 4 - 2);
-            if (fabs(velX) < 0.3) velX = 0;
-            double velY = 1.0 * analogRead(JOY_AY) / 4096 * 4 - 2;
-            if (fabs(velY) < 0.3) velY = 0;
-            double velZ = - (1.0 * analogRead(JOY_BX) / 4096 * PI - PI / 2);
+            double velX = - (1.0 * analogRead(JOY_AX) / 4096 * 2 - 1);
+            if (fabs(velX) < 0.2) velX = 0;
+            double velY = 1.0 * analogRead(JOY_AY) / 4096 * 2 - 1;
+            if (fabs(velY) < 0.2) velY = 0;
+            double velZ = 1.0 * analogRead(JOY_BX) / 4096 * PI - PI / 2;
             if (fabs(velZ) < 0.3) velZ = 0;
             String velStr = "self._dash.at(";
             velStr.concat(String(velX, 4));
@@ -253,8 +253,8 @@ void loop() {
         tft.print("FPS ");
         tft.print(fps);
         // Flash the robot
-        constrain(pixelToDraw[0], 0, 139);
-        constrain(pixelToDraw[1], 0, 139);
+        pixelToDraw[0] = constrain(pixelToDraw[0], 0, 139);
+        pixelToDraw[1] = constrain(pixelToDraw[1], 0, 139);
         if (millis() - flashTS > 250) {
             tft.writePixel(pixelToDraw[0], pixelToDraw[1], ILI9341_PURPLE);
             flashTS = millis();

@@ -6,7 +6,6 @@ class Flow():
     '''UESTC 2018 Robocon Team
     Flow Package
     '''
-
     def __init__(self, dash, debug=True):
         self._route = {
             'Self Test': {
