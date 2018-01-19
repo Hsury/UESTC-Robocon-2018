@@ -2,7 +2,8 @@ from math import sin, cos, pi, sqrt
 from elmo import Elmo
 
 class Omni():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     Omni Driver Package
     '''
     WHEEL_RADIUS = 0.078

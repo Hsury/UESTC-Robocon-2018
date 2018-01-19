@@ -4,14 +4,15 @@ import threading
 import time
 
 class Spy():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     Spy Package
     '''
     isSpying = False
 
     def __init__(self, dash):
         self._dash = dash
-        self._dataDir = os.path.dirname(os.getcwd()) + os.sep + 'data'
+        self._dataDir =  os.getcwd() + os.sep + 'data'  #To Get Parent Directory Use os.path.dirname(os.getcwd())
     
     def __watch(self):
         try:

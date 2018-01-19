@@ -1,7 +1,8 @@
 import serial
 
 class Elmo():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     ELMO Driver Package
     '''
     SPEED_MODE = 2

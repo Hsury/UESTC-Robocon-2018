@@ -2,7 +2,8 @@ from math import sin, cos, pi, sqrt
 import threading
 
 class Dash():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     Dash Package
     '''
     POSITION_MODE = 0

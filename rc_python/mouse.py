@@ -3,7 +3,8 @@ from evdev import InputDevice, categorize, ecodes
 import threading
 
 class Mouse():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     Mouse Package
     '''
     def __init__(self, merge, port='/dev/input/event3'):

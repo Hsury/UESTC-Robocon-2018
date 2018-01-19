@@ -9,7 +9,8 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
 class Editor():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     Editor
     '''
     def __init__(self, degree=2, sampling=500):
@@ -30,7 +31,7 @@ class EditorWindow(QWidget):
         super(EditorWindow, self).__init__()
         self._degree = degree
         self._sampling = sampling
-        self._dataDir = os.path.dirname(os.getcwd()) + os.sep + 'data'
+        self._dataDir =  os.getcwd() + os.sep + 'data'  #To Get Parent Directory Use os.path.dirname(os.getcwd())
         self._endList = np.zeros((1, 3))
         self._bezierList = np.zeros((self._sampling, 3))
         self._endIdx = 0

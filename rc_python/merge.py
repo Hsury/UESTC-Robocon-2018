@@ -3,7 +3,8 @@ from gyro import Gyro
 import threading
 
 class Merge():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     Merge Package
     '''
     def __init__(self, gyroPort='/dev/gyro', gyroBaudrate=921600):

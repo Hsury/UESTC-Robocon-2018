@@ -8,13 +8,14 @@ from mecanum import Mecanum
 from omni import Omni
 
 class Plot():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     Plot Package
     '''
     def __init__(self, filename='rc_trace.txt', interval=0.01):
         self._filename = filename
         self._interval = interval
-        self._dataDir = os.path.dirname(os.getcwd()) + os.sep + 'data'
+        self._dataDir =  os.getcwd() + os.sep + 'data'  #To Get Parent Directory Use os.path.dirname(os.getcwd())
         self.__loadPath()
         self.__show()
     

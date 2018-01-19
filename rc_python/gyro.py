@@ -3,7 +3,8 @@ import serial
 import threading
 
 class Gyro():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     Gyro Driver Package
     '''
     def __init__(self, port='/dev/gyro', baudrate=921600):

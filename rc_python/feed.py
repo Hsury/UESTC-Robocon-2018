@@ -4,13 +4,14 @@ import threading
 import numpy as np
 
 class Feed():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     Feed Package
     '''
     def __init__(self, dash, filename='rc_bezier.txt'):
         self._dash = dash
         self._filename = filename
-        self._dataDir = os.path.dirname(os.getcwd()) + os.sep + 'data'
+        self._dataDir =  os.getcwd() + os.sep + 'data'  #To Get Parent Directory Use os.path.dirname(os.getcwd())
         self._ctrl = -1
         self._feedList = np.empty(shape=[0, 3])
         self.__loadPath()
@@ -40,9 +41,45 @@ class Feed():
         self._dash.lock()
         self._ctrl = -1
     
+    def __broadcastNew(self, accTime=1, unifTime=10, decTime=1):
+        from time import sleep
+        import time
+        millis = lambda: int(round(time.time() * 1000))
+        totalTime = accTime + unifTime + decTime
+        unifInterval = unifTime / len(self._feedList)
+        print('Interval={}, ListLength={}'.format(unifInterval, len(self._feedList)))
+        self._ctrl = 0
+        #self._dash.unlock()
+        self._idx = 0
+        startTimestamp = millis()
+        while millis() - startTimestamp <= unifTime * 1000:
+            while self._ctrl == 1:
+                sleep(0.005)
+            if self._ctrl == 2:
+                break
+            realIndex = int((millis() - startTimestamp) // (unifInterval * 1000))
+            if realIndex >= len(self._feedList):
+                break
+            elif self._idx != realIndex:
+                self._idx = realIndex
+                print('TimeDelta={}, Index={}'.format(millis() - startTimestamp, self._idx))
+                deltaX = self._feedList[self._idx][0] - self._dash.position[0]
+                deltaY = self._feedList[self._idx][1] - self._dash.position[1]
+                deltaZ = self._feedList[self._idx][2] - self._dash.position[2]
+                speed = [deltaX / unifInterval, deltaY / unifInterval, deltaZ / unifInterval]
+                speed[0] = max(-3, min(3, speed[0]))
+                speed[1] = max(-3, min(3, speed[1]))
+                speed[2] = max(- pi / 2, min(pi / 2, speed[1]))
+                self._dash._base.go(speed[0], speed[1], speed[2], self._dash._merge.data[2])
+                print(' ', speed[0], speed[1], speed[2])
+        self._dash.to(0, 0, 0)
+        self._dash.lock()
+        self._ctrl = -1
+    
     def play(self, interval=0.1, zero=0, step=1):
         if self._ctrl == -1:
-            broadcastThd = threading.Thread(target=self.__broadcast, args=(interval, zero, step))
+            #broadcastThd = threading.Thread(target=self.__broadcast, args=(interval, zero, step))
+            broadcastThd = threading.Thread(target=self.__broadcastNew, args=(1, 5, 1))
             broadcastThd.setDaemon(True)
             broadcastThd.start()
     

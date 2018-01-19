@@ -3,7 +3,8 @@ import threading
 import json
 
 class Remote():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     Remote Package
     '''
     def __init__(self, dash, flow, port=2018):

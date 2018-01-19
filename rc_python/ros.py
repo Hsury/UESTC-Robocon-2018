@@ -2,7 +2,8 @@ import rospy
 from geometry_msgs.msg import Vector3
 
 class Ros():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     ROS Package
     '''
     def __init__(self, dash):

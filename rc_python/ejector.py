@@ -1,7 +1,8 @@
 from elmo import Elmo
 
 class Ejector():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     Ejector Package
     '''
     def __init__(self, leftPort='COM3', rightPort='COM6', baudrate=19200):

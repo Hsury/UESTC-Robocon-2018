@@ -1,0 +1,6 @@
+numpy==1.13.3
+matplotlib==2.1.0
+PyQt5==5.9.2
+bezier==0.6.1
+evdev==0.7.0
+pyserial==3.4

@@ -9,7 +9,8 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
 class Viewer():
-    '''UESTC 2018 Robocon Team
+    '''
+    UESTC 2018 Robocon Team
     Viewer
     '''
     def __init__(self, dash):
@@ -68,7 +69,7 @@ class ViewerWindow(QWidget):
         self._getGoalQ = getGoalQ
         self._setGoalQ = setGoalQ
         self._speed = speed
-        self._dataDir = os.path.dirname(os.getcwd()) + os.sep + 'data'
+        self._dataDir =  os.getcwd() + os.sep + 'data'  #To Get Parent Directory Use os.path.dirname(os.getcwd())
         self._pixelList = np.zeros((1, 3))
         self._feedList = np.empty(shape=[0, 3])
         self._cursor = [0] * 3
