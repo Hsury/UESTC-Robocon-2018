@@ -6,10 +6,10 @@ class Mecanum():
     UESTC 2018 Robocon Team
     Mecanum Driver Package
     '''
-    WHEEL_RADIUS = 0.075
-    SIDE_A_LENGTH = 0.75
-    SIDE_B_LENGTH = 0.75
-    REDUCTION_RATIO = 11.39 / 2
+    WHEEL_RADIUS = 0.05
+    SIDE_A_LENGTH = 0.64
+    SIDE_B_LENGTH = 0.45
+    REDUCTION_RATIO = 19
 
     def __init__(self, leftFrontPort='/dev/elmo0', leftRearPort='/dev/elmo1', rightFrontPort='/dev/elmo2', rightRearPort='/dev/elmo3', baudrate=19200):
         self._port = [leftFrontPort, leftRearPort, rightFrontPort, rightRearPort]
@@ -51,7 +51,7 @@ class Mecanum():
                 - v2jv((vX * cos(pi / 4 - orient) - vY * sin(pi / 4 - orient) - w2v(wZ)) * sqrt(2))]
     
     def go(self, vX=0, vY=0, wZ=0, orient=0):
-        self._speedList = self.resolve(vX, vY, wZ, orient + pi)
+        self._speedList = self.resolve(vX, vY, wZ, orient)
         for idx in range(4):
             self._elmoList[idx].speed = self._speedList[idx]
         for idx in range(4):

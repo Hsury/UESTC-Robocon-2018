@@ -25,7 +25,7 @@ class Feed():
         except:
             pass
     
-    def __broadcast(self, interval=0.1, zero=0, step=1):
+    def __broadcast(self, interval=0.01, zero=0, step=1):
         from time import sleep
         self._ctrl = 0
         self._dash.unlock()
@@ -76,10 +76,10 @@ class Feed():
         self._dash.lock()
         self._ctrl = -1
     
-    def play(self, interval=0.1, zero=0, step=1):
+    def play(self, interval=0.01, zero=0, step=1):
         if self._ctrl == -1:
-            #broadcastThd = threading.Thread(target=self.__broadcast, args=(interval, zero, step))
-            broadcastThd = threading.Thread(target=self.__broadcastNew, args=(1, 5, 1))
+            broadcastThd = threading.Thread(target=self.__broadcast, args=(interval, zero, step))
+            #broadcastThd = threading.Thread(target=self.__broadcastNew, args=(1, 5, 1))
             broadcastThd.setDaemon(True)
             broadcastThd.start()
     
