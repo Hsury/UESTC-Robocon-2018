@@ -1,5 +1,9 @@
 from math import sin, cos, pi, sqrt
 import threading
+import time
+
+millis = lambda: int(round(time.time() * 1000))
+clamp = lambda value, lower, upper: min(max(value, lower), upper)
 
 class Dash():
     '''
@@ -40,11 +44,11 @@ class Dash():
                 if self.mode == Dash.TEST_MODE:
                     self._cuiDash.setPosition(self._merge.data[0], self._merge.data[1], self._merge.data[2])
                     self._speed = self._cuiDash.resolve()
-                #self._speed[0] = self.__limiter(self._speed[0], -2, 2)
-                #self._speed[1] = self.__limiter(self._speed[1], -2, 2)
-                #self._speed[2] = self.__limiter(self._speed[2], - pi / 2, pi / 2)
+                #self._speed[0] = clamp(self._speed[0], -2, 2)
+                #self._speed[1] = clamp(self._speed[1], -2, 2)
+                #self._speed[2] = clamp(self._speed[2], - pi / 2, pi / 2)
                 self._base.go(self._speed[0], self._speed[1], self._speed[2], self._merge.data[2])
-            sleep(0.001)
+            sleep(0.005)
     
     def __resolve(self, position, goal):
         for idx in range(3):
@@ -63,14 +67,6 @@ class Dash():
         self._resSpeed = sqrt(self._speed[0] ** 2 + self._speed[1] ** 2)
         self._speed[2] = self._dist[2] * Dash.COEF_ANGULAR
 
-    def __limiter(self, value, lower, upper):
-        if value < lower:
-            return lower
-        elif value > upper:
-            return upper
-        else:
-            return value
-    
     def lock(self):
         self._lock = True
         self._speed = [0] * 3

@@ -41,7 +41,7 @@ class Feed():
         self._dash.lock()
         self._ctrl = -1
     
-    def __broadcastNew(self, accTime=1, unifTime=10, decTime=1):
+    def __broadcastTest(self, accTime=1, unifTime=10, decTime=1):   #Unavailable
         from time import sleep
         import time
         millis = lambda: int(round(time.time() * 1000))
@@ -79,7 +79,6 @@ class Feed():
     def play(self, interval=0.01, zero=0, step=1):
         if self._ctrl == -1:
             broadcastThd = threading.Thread(target=self.__broadcast, args=(interval, zero, step))
-            #broadcastThd = threading.Thread(target=self.__broadcastNew, args=(1, 5, 1))
             broadcastThd.setDaemon(True)
             broadcastThd.start()
     
