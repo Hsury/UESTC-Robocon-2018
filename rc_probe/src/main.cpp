@@ -65,8 +65,8 @@ const char* STA_PASSWORD = "***REMOVED***";
 
 CAN_device_t CAN_cfg;
 CAN_frame_t rx_frame;
-uint16_t packNum;
-uint16_t DeviceNotify[NOTIFY_DEVICE_NUM];
+uint32_t packNum;
+uint32_t DeviceNotify[NOTIFY_DEVICE_NUM];
 
 TaskHandle_t WiFiStationTaskHandle;
 TaskHandle_t TFTUpdateTaskHandle;
@@ -200,7 +200,7 @@ void WiFiStationTask(void * pvParameters)
 {
     WiFi.begin(STA_SSID, STA_PASSWORD); // Begin STA mode
     WiFi.setHostname(HOST_NAME);
-    uint16_t WiFiTimeout = millis() + 3E4; // Set WiFi STA connection timeout to 30 seconds
+    uint32_t WiFiTimeout = millis() + 3E4; // Set WiFi STA connection timeout to 30 seconds
     while (WiFi.status() != WL_CONNECTED && millis() < WiFiTimeout)
     {
         delay(500); // RTOS delay function: vTaskDelay(pdMS_TO_TICKS(xms)), it seems that delay() acts the same to it
@@ -260,7 +260,7 @@ void WiFiStationTask(void * pvParameters)
 
 void TFTUpdateTask(void * pvParameters)
 {
-    int line = 1;
+    uint8_t line = 1;
     while (1)
     {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -398,8 +398,8 @@ void RobotSelftestTask(void * pvParameters)
     AddToPlaylist(2);
     AddToPlaylist(4);
     boolean isOnline[NOTIFY_DEVICE_NUM + 1]; // Preserve index 0 as global status
-    uint16_t SelftestBegin = millis();
-    uint16_t SelftestEnd = millis() + 1E4; // Set robot selftest timeout to 10 seconds
+    uint32_t SelftestBegin = millis();
+    uint32_t SelftestEnd = millis() + 1E4; // Set robot selftest timeout to 10 seconds
     while (millis() < SelftestEnd)
     {
         isOnline[0] = true;
