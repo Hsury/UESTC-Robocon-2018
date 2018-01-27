@@ -31,7 +31,7 @@
 
 #define ENABLE_TOUCH_CALIBRATE 0
 
-#define VOLUME 10
+#define VOLUME 1
 #define HOST_NAME "AR"
 #define NOTIFY_DEVICE_NUM 16
 
@@ -66,13 +66,27 @@ const char* STA_PASSWORD = "***REMOVED***";
 CAN_device_t CAN_cfg;
 CAN_frame_t rx_frame;
 uint32_t packNum;
+
+/*
+CAN Device Table
+
+Index     ID     Device     Variable    Description
+  0      0x12    DT35_H     DT35[0]        Head
+  1      0x13    DT35_F     DT35[1]     Left Front
+  2      0x14    DT35_R     DT35[2]     Left Rear
+*/
+
+#define DT35_H_ID 0x22
+#define DT35_F_ID 0x13
+#define DT35_R_ID 0x14
+
 uint32_t DeviceNotify[NOTIFY_DEVICE_NUM];
+uint32_t DT35[3]; // Array to save the data of DT35s
 
 TaskHandle_t WiFiStationTaskHandle;
-TaskHandle_t TFTUpdateTaskHandle;
+TaskHandle_t TFTTaskHandle;
 TaskHandle_t CANRecvTaskHandle;
 TaskHandle_t AudioTaskHandle;
-TaskHandle_t TouchscreenTaskHandle;
 TaskHandle_t TestTaskHandle;
 TaskHandle_t RobotSelftestTaskHandle;
 
@@ -86,10 +100,9 @@ TFT_eSPI tft = TFT_eSPI();
 RemoteDebug Debug;
 
 void WiFiStationTask(void * pvParameters);
-void TFTUpdateTask(void * pvParameters);
+void TFTTask(void * pvParameters);
 void CANRecvTask(void * pvParameters);
 void AudioTask(void * pvParameters);
-void TouchscreenTask(void * pvParameters);
 void TestTask(void * pvParameters);
 void RobotSelftestTask(void * pvParameters);
 
@@ -107,6 +120,11 @@ void setup() {
     Serial1.begin(115200, SERIAL_8N1, UART1_RX_PIN, UART1_TX_PIN);
     Serial2.begin(9600, SERIAL_8N1, UART2_RX_PIN, UART2_TX_PIN);
 
+    /*
+    pinMode(TFT_PEN_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(TFT_PEN_PIN), TouchISR, FALLING);
+    */
+
     tft.init();
     tft.setRotation(3);
     #if ENABLE_TOUCH_CALIBRATE
@@ -116,11 +134,6 @@ void setup() {
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setTextFont(2);
     tft.println("SYSTEM STARTED");
-
-    /*
-    pinMode(TOUCH_INT_PIN, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(TFT_PEN_PIN), TouchISR, FALLING);
-    */
 
     WiFi.softAP(AP_SSID, AP_PASSWORD); // Begin AP mode  // ssid_hidden = 1
     WiFi.softAPsetHostname(HOST_NAME);
@@ -135,8 +148,7 @@ void setup() {
     CAN_cfg.tx_pin_id = CAN_TX_PIN; // Set CAN TX Pin
     CAN_cfg.rx_pin_id = CAN_RX_PIN; // Set CAN RX Pin
     CAN_cfg.rx_queue = xQueueCreate(10, sizeof(CAN_frame_t)); // Create CAN RX Queue
-    //start CAN Module
-    ESP32Can.CANInit();
+    ESP32Can.CANInit(); //Start CAN module
 
     ArduinoOTA
         .onStart([]() {
@@ -166,7 +178,7 @@ void setup() {
     ArduinoOTA.begin(); // Allow OTA process in AP Mode, default port is 3232
 
     Debug.begin(HOST_NAME); // Initiaze the telnet server
-    //Debug.setResetCmdEnabled(true); // Enable the reset command
+    Debug.setResetCmdEnabled(true); // Enable the reset command
     String helpCmd = "play - Drive the speaker\n";
 	helpCmd.concat("uestc - emmmm");
 	Debug.setHelpProjectsCmds(helpCmd);
@@ -179,11 +191,10 @@ void setup() {
 
     AudioFIFO = xQueueCreate(32, sizeof(uint8_t)); // Create a FIFO to buffer the playing request
 
-    xTaskCreate(WiFiStationTask, "WiFi Station Config", 2048, NULL, 1, &WiFiStationTaskHandle);
-    xTaskCreate(TFTUpdateTask, "TFT Update", 2048, NULL, 2, &TFTUpdateTaskHandle);
-    xTaskCreate(CANRecvTask, "CAN Bus Receive", 2048, NULL, 3, &CANRecvTaskHandle);
-    xTaskCreate(AudioTask, "Audio Control", 2048, NULL, 4, &AudioTaskHandle);
-    xTaskCreate(TouchscreenTask, "Touchscreen Control", 2048, NULL, 5, &TouchscreenTaskHandle);
+    xTaskCreate(WiFiStationTask, "WiFi Station Config", 2048, NULL, 2, &WiFiStationTaskHandle);
+    xTaskCreate(TFTTask, "TFT Update", 2048, NULL, 3, &TFTTaskHandle);
+    xTaskCreate(CANRecvTask, "CAN Bus Receive", 2048, NULL, 4, &CANRecvTaskHandle);
+    xTaskCreate(AudioTask, "Audio Control", 2048, NULL, 1, &AudioTaskHandle);
     xTaskCreate(TestTask, "Priority Test", 1024, NULL, 1, &TestTaskHandle);
 
     AddToPlaylist(1); // Play OS started tone
@@ -258,25 +269,43 @@ void WiFiStationTask(void * pvParameters)
     vTaskDelete(NULL);
 }
 
-void TFTUpdateTask(void * pvParameters)
+void TFTTask(void * pvParameters)
 {
+    uint16_t x = 0, y = 0; // To store the touch coordinates
+    boolean pressed;
     uint8_t line = 1;
     while (1)
     {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        tft.printf("%u, ID: %d, Data: ", packNum, rx_frame.MsgID);
-        for (uint8_t i = 0; i < rx_frame.FIR.B.DLC; i++)
+        // Display control code is below
+        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(10))) // If task is notified within 10ms, refresh the screen
         {
-            tft.printf("%02x ", rx_frame.data.u8[i]);
+            tft.printf("%u, ID: %d, Data: ", packNum, rx_frame.MsgID);
+            for (uint8_t i = 0; i < rx_frame.FIR.B.DLC; i++)
+            {
+                tft.printf("%02x ", rx_frame.data.u8[i]);
+            }
+            tft.println();
+            line++;
+            if (line >= 15)
+            {
+                tft.fillScreen(TFT_BLACK);
+                tft.setCursor(0, 0);
+                line = 0;
+            }
         }
-        tft.println();
-        line++;
-        if (line >= 15)
+        // Touchscreen control code is below
+        pressed = tft.getTouch(&x, &y); 
+        if (pressed)
         {
-            tft.fillScreen(TFT_BLACK);
-            tft.setCursor(0, 0);
-            line = 0;
+            Serial.printf("Touch, x=%u, y=%u\r\n", x, y);
+            tft.fillCircle(x, y, 2, TFT_WHITE);
+            if (RobotSelftestTaskHandle == NULL)
+            {
+                Serial.println("Robot Selftest task began");
+                xTaskCreate(RobotSelftestTask, "Robot Selftest Control", 2048, NULL, 5, &RobotSelftestTaskHandle);
+            }
         }
+        delay(10);
     }
     vTaskDelete(NULL);
 }
@@ -293,16 +322,26 @@ void CANRecvTask(void * pvParameters)
             {
                 switch (rx_frame.MsgID)
                 {
-                    case 0x12:
+                    case DT35_H_ID:
                     DeviceNotify[0] = millis();
+                    memcpy(&DT35[0], &rx_frame.data.u8[0], 4);
+                    Debug.printf("DT35_H: %u\r\n", DT35[0]);
                     break;
 
-                    case 0x13:
+                    case DT35_F_ID:
                     DeviceNotify[1] = millis();
+                    memcpy(&DT35[1], &rx_frame.data.u8[0], 4);
+                    Debug.printf("DT35_F: %u\r\n", DT35[1]);
+                    break;
+
+                    case DT35_R_ID:
+                    DeviceNotify[2] = millis();
+                    memcpy(&DT35[2], &rx_frame.data.u8[0], 4);
+                    Debug.printf("DT35_R: %u\r\n", DT35[2]);
                     break;
                 }
             }
-            xTaskNotifyGive(TFTUpdateTaskHandle); // TEST now, print CAN Bus information on the screen
+            xTaskNotifyGive(TFTTaskHandle); // TEST now, print CAN Bus information on the screen
             Serial.println("-------------------------");
             Serial.printf("Pack Number: %u\r\n", packNum);
             Serial.print("Type: ");
@@ -356,28 +395,6 @@ void AudioTask(void * pvParameters)
         Serial.printf("Begin to play voice %u\r\n", index);
         DEBUG_I("Begin to play voice %u\r\n", index);
         delay(250); // Note that the library or the audio chip itself does not support high rate command stream, so wait here
-    }
-    vTaskDelete(NULL);
-}
-
-void TouchscreenTask(void * pvParameters)
-{
-    uint16_t x = 0, y = 0; // To store the touch coordinates
-    boolean pressed;
-    while (1)
-    {
-        pressed = tft.getTouch(&x, &y); 
-        if (pressed)
-        {
-            Serial.printf("Touch, x=%u, y=%u\r\n", x, y);
-            tft.fillCircle(x, y, 2, TFT_WHITE);
-            if (RobotSelftestTaskHandle == NULL)
-            {
-                Serial.println("Robot Selftest task began");
-                xTaskCreate(RobotSelftestTask, "Robot Selftest Control", 2048, NULL, 6, &RobotSelftestTaskHandle);
-            }
-        }
-        delay(25); // Assumes that the pressing duration must be longer than this
     }
     vTaskDelete(NULL);
 }
