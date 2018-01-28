@@ -5,5 +5,9 @@
     "files.associations": {
         "array": "cpp",
         "initializer_list": "cpp"
+    },
+    "terminal.integrated.env.linux": {
+        "PATH": "/home/hsury/.platformio/penv/bin:/home/hsury/.platformio/penv:/home/hsury/anaconda3/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/sbin:/usr/sbin",
+        "PLATFORMIO_CALLER": "vscode"
     }
 }

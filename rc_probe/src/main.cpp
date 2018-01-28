@@ -29,11 +29,14 @@
 #include <RemoteDebug.h>
 #include <BY8X01-16P.h>
 
+#include "bitmap/uestc.h"
+#include "bitmap/robocon.h"
+
 #define ENABLE_TOUCH_CALIBRATE 0
 
-#define VOLUME 1
+#define VOLUME 5
 #define HOST_NAME "AR"
-#define NOTIFY_DEVICE_NUM 16
+#define NOTIFY_DEVICE_NUM 3
 
 #define CAN_TX_PIN GPIO_NUM_5
 #define CAN_RX_PIN GPIO_NUM_4
@@ -70,15 +73,24 @@ uint32_t packNum;
 /*
 CAN Device Table
 
-Index     ID     Device     Variable    Description
-  0      0x12    DT35_H     DT35[0]        Head
-  1      0x13    DT35_F     DT35[1]     Left Front
-  2      0x14    DT35_R     DT35[2]     Left Rear
+Index     ID        Device       Variable       Description
+----------------------------------------------------------------------
+  0      0x10       Base         Base           Base Controller
+  1      0x20       Cradle       Cradle         Cradle Controller
+  2      0x30       Gyro         Gyro           Gyro
+  3      0x31       Encoder      Encoder        Encoder
+  4      0x40       Elmo_BLF     Elmo[0]        Base Left Front Elmo
+  5      0x41       Elmo_BLR     Elmo[1]        Base Left Rear Elmo
+  6      0x42       Elmo_BRR     Elmo[2]        Base Right Rear Elmo
+  7      0x43       Elmo_BRF     Elmo[3]        Base Right Front Elmo
+  8      0x50       DT35_H       DT35[0]        Head
+  9      0x51       DT35_F       DT35[1]        Left Front
+  10     0x52       DT35_R       DT35[2]        Left Rear
 */
 
-#define DT35_H_ID 0x22
-#define DT35_F_ID 0x13
-#define DT35_R_ID 0x14
+#define DT35_H_ID 0x50
+#define DT35_F_ID 0x51
+#define DT35_R_ID 0x52
 
 uint32_t DeviceNotify[NOTIFY_DEVICE_NUM];
 uint32_t DT35[3]; // Array to save the data of DT35s
@@ -86,11 +98,13 @@ uint32_t DT35[3]; // Array to save the data of DT35s
 TaskHandle_t WiFiStationTaskHandle;
 TaskHandle_t TFTTaskHandle;
 TaskHandle_t CANRecvTaskHandle;
+TaskHandle_t UARTRecvTaskHandle;
 TaskHandle_t AudioTaskHandle;
 TaskHandle_t TestTaskHandle;
 TaskHandle_t RobotSelftestTaskHandle;
 
 xQueueHandle AudioFIFO;
+xQueueHandle SerialFIFO;
 
 HardwareSerial Serial1(1);  // UART1/Serial1 pins 9, 10
 HardwareSerial Serial2(2);  // UART2/Serial2 pins 16, 17
@@ -99,9 +113,16 @@ BY8X0116P audioController(Serial2, AUDIO_BUSY_PIN);
 TFT_eSPI tft = TFT_eSPI();
 RemoteDebug Debug;
 
+/*
+NOTE: If we create a 16-bit Sprite, 320 x 240 x 2 bytes RAM is occupied, not a good choice
+String UARTHistory[14];
+String CANHistory[14];
+*/
+
 void WiFiStationTask(void * pvParameters);
 void TFTTask(void * pvParameters);
 void CANRecvTask(void * pvParameters);
+void UARTRecvTask(void * pvParameters);
 void AudioTask(void * pvParameters);
 void TestTask(void * pvParameters);
 void RobotSelftestTask(void * pvParameters);
@@ -130,10 +151,9 @@ void setup() {
     #if ENABLE_TOUCH_CALIBRATE
     TouchscreenCalibrate();
     #endif
-    tft.fillScreen(TFT_BLACK);
+    tft.fillScreen(TFT_WHITE);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setTextFont(2);
-    tft.println("SYSTEM STARTED");
 
     WiFi.softAP(AP_SSID, AP_PASSWORD); // Begin AP mode  // ssid_hidden = 1
     WiFi.softAPsetHostname(HOST_NAME);
@@ -148,7 +168,7 @@ void setup() {
     CAN_cfg.tx_pin_id = CAN_TX_PIN; // Set CAN TX Pin
     CAN_cfg.rx_pin_id = CAN_RX_PIN; // Set CAN RX Pin
     CAN_cfg.rx_queue = xQueueCreate(10, sizeof(CAN_frame_t)); // Create CAN RX Queue
-    ESP32Can.CANInit(); //Start CAN module
+    ESP32Can.CANInit(); // Start CAN module
 
     ArduinoOTA
         .onStart([]() {
@@ -190,10 +210,12 @@ void setup() {
     //audioController.printModuleInfo();
 
     AudioFIFO = xQueueCreate(32, sizeof(uint8_t)); // Create a FIFO to buffer the playing request
+    SerialFIFO = xQueueCreate(2048, sizeof(char)); // Create a FIFO to buffer Serial data
 
     xTaskCreate(WiFiStationTask, "WiFi Station Config", 2048, NULL, 2, &WiFiStationTaskHandle);
     xTaskCreate(TFTTask, "TFT Update", 2048, NULL, 3, &TFTTaskHandle);
     xTaskCreate(CANRecvTask, "CAN Bus Receive", 2048, NULL, 4, &CANRecvTaskHandle);
+    xTaskCreate(UARTRecvTask, "UART Receive", 2048, NULL, 4, &UARTRecvTaskHandle);
     xTaskCreate(AudioTask, "Audio Control", 2048, NULL, 1, &AudioTaskHandle);
     xTaskCreate(TestTask, "Priority Test", 1024, NULL, 1, &TestTaskHandle);
 
@@ -271,39 +293,113 @@ void WiFiStationTask(void * pvParameters)
 
 void TFTTask(void * pvParameters)
 {
-    uint16_t x = 0, y = 0; // To store the touch coordinates
+    uint8_t scene = 0;
+    uint16_t xPos = 0, yPos = 16; // To store command interface coordinates
     boolean pressed;
+    uint16_t xTouch = 0, yTouch = 0; // To store the touch coordinates
+    char tmp;
     uint8_t line = 1;
     while (1)
     {
         // Display control code is below
-        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(10))) // If task is notified within 10ms, refresh the screen
+        switch (scene)
         {
-            tft.printf("%u, ID: %d, Data: ", packNum, rx_frame.MsgID);
-            for (uint8_t i = 0; i < rx_frame.FIR.B.DLC; i++)
+            case 0: // Booting
+            tft.pushImage((320 - UESTC_WIDTH) / 2, (240 - UESTC_HEIGHT) / 2, UESTC_WIDTH, UESTC_HEIGHT, uestc); // Display UESTC LOGO
+            delay(2500);
+            tft.pushImage((320 - ROBOCON_WIDTH) / 2, (240 - ROBOCON_HEIGHT) / 2, ROBOCON_WIDTH, ROBOCON_HEIGHT, robocon); // Display Robocon 2018 LOGO
+            delay(2500);
+            tft.fillScreen(TFT_BLACK);
+            scene = 1;
+            break;
+
+            case 1: // Main interface
+            tft.setCursor(0, 50);
+            tft.println("DT35 Debug Tool");
+            tft.setCursor(0, 100);
+            tft.printf("Head: %u\r\n", DT35[0]);
+            tft.printf("Front: %u\r\n", DT35[1]);
+            tft.printf("Rear: %u\r\n", DT35[2]);
+            break;
+            
+            case 2: // CAN Bus Monitor interface
+            if (ulTaskNotifyTake(pdTRUE, 0)) // If task is notified, which means that a new CAN frame has come, refresh the screen
             {
-                tft.printf("%02x ", rx_frame.data.u8[i]);
+                if (yPos >= 240)
+                {
+                    tft.fillRect(0, 16, 320, 224, TFT_BLACK);
+                    yPos = 16;
+                }
+                tft.setCursor(0, yPos);
+                tft.printf("%u, ID: %d, Data: ", packNum, rx_frame.MsgID);
+                for (uint8_t i = 0; i < rx_frame.FIR.B.DLC; i++)
+                {
+                    tft.printf("%02x ", rx_frame.data.u8[i]);
+                }
+                yPos += 16;
             }
-            tft.println();
-            line++;
-            if (line >= 15)
+            break;
+
+            case 3: // Serial Terminal interface
+            while (xQueueReceive(SerialFIFO, &tmp, 0) == pdTRUE)
             {
-                tft.fillScreen(TFT_BLACK);
-                tft.setCursor(0, 0);
-                line = 0;
+                if (yPos >= 240)
+                {
+                    tft.fillRect(0, 16, 320, 224, TFT_BLACK);
+                    xPos = 0;
+                    yPos = 16;
+                }
+                if (tmp > 31 && tmp < 128) xPos += tft.drawChar(tmp, xPos, yPos); // Char can be displayed
+                if (tmp == '\r') xPos = 0; // Return
+                if (tmp == '\n') yPos += 16; // New Line
             }
+            break;
         }
         // Touchscreen control code is below
-        pressed = tft.getTouch(&x, &y); 
+        pressed = tft.getTouch(&xTouch, &yTouch); 
         if (pressed)
         {
-            Serial.printf("Touch, x=%u, y=%u\r\n", x, y);
-            tft.fillCircle(x, y, 2, TFT_WHITE);
+            Serial.printf("Touch, x=%u, y=%u\r\n", xTouch, yTouch);
+            //tft.fillCircle(x, y, 2, TFT_WHITE);
+            switch (scene)
+            {
+                case 1:
+                tft.fillScreen(TFT_BLACK); // Clear screen
+                tft.fillRect(0, 0, 320, 16, TFT_RED); // Draw red title bar
+                tft.setTextColor(TFT_WHITE, TFT_RED);
+                tft.setTextDatum(CC_DATUM); // Text align to Centre-Centre, same as MC_DATUM
+                tft.drawString("CAN Bus Monitor", 160 , 8);
+                tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                tft.setTextDatum(TL_DATUM); // Text align to Top-Left
+                xPos = 0;
+                yPos = 16;
+                scene = 2;
+                break;
+
+                case 2:
+                tft.fillScreen(TFT_BLACK); // Clear screen
+                tft.fillRect(0, 0, 320, 16, TFT_BLUE); // Draw blue title bar
+                tft.setTextColor(TFT_WHITE, TFT_BLUE);
+                tft.setTextDatum(CC_DATUM); // Text align to Centre-Centre, same as MC_DATUM
+                tft.drawString("Serial Terminal - 115200 baud", 160 , 8);
+                tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                tft.setTextDatum(TL_DATUM); // Text align to Top-Left
+                xPos = 0;
+                yPos = 16;
+                scene = 3;
+                break;
+
+                case 3:
+                tft.fillScreen(TFT_BLACK); // Clear screen
+                scene = 1;
+                break;
+            }
             if (RobotSelftestTaskHandle == NULL)
             {
                 Serial.println("Robot Selftest task began");
                 xTaskCreate(RobotSelftestTask, "Robot Selftest Control", 2048, NULL, 5, &RobotSelftestTaskHandle);
-            }
+            }            
+            delay(100);
         }
         delay(10);
     }
@@ -365,6 +461,20 @@ void CANRecvTask(void * pvParameters)
     vTaskDelete(NULL);
 }
 
+void UARTRecvTask(void * pvParameters)
+{
+    char tmp; // Variable to temporarily save the char coming from UART
+    while (1)
+    {
+        if (Serial.available())
+        {
+            tmp = Serial.read();
+            xQueueSend(SerialFIFO, &tmp, 0); // Insert item into the queue
+        }
+    }
+    vTaskDelete(NULL);
+}
+
 void AudioTask(void * pvParameters)
 {
     /*
@@ -372,18 +482,19 @@ void AudioTask(void * pvParameters)
 
     001启动音乐.mp3
     002提示音.mp3
-    003设备已联网.mp3
-    004机器自检已启动.mp3
+    003NetworkConnected.mp3
+    004自检开始.mp3
     005自检通过.mp3
     006自检未通过.mp3
     007底盘主控掉线.mp3
     008云台主控掉线.mp3
     009陀螺仪与码盘掉线.mp3
-    010一.mp3
-    011二.mp3
-    012三.mp3
-    013四.mp3
-    014号电机掉线.mp3
+    010号电机掉线.mp3
+    011号激光掉线.mp3
+    012一.mp3
+    013二.mp3
+    014三.mp3
+    015四.mp3
     */
     
     while (1)
@@ -416,7 +527,7 @@ void RobotSelftestTask(void * pvParameters)
     AddToPlaylist(4);
     boolean isOnline[NOTIFY_DEVICE_NUM + 1]; // Preserve index 0 as global status
     uint32_t SelftestBegin = millis();
-    uint32_t SelftestEnd = millis() + 1E4; // Set robot selftest timeout to 10 seconds
+    uint32_t SelftestEnd = millis() + 5E3; // Set robot selftest timeout to 5 seconds
     while (millis() < SelftestEnd)
     {
         isOnline[0] = true;
@@ -442,7 +553,7 @@ void RobotSelftestTask(void * pvParameters)
             if (!isOnline[i]) Serial.printf("Device %u is offline\r\n", i); // Later will change to AddToPlaylist()
         }
     }
-    delay(5000); // Wait for a short time
+    delay(2500); // Wait for a short time
     RobotSelftestTaskHandle = NULL;
     vTaskDelete(NULL);
 }

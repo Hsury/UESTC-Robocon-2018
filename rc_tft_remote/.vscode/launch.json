@@ -6,8 +6,8 @@
             "request": "launch",
             "cwd": "${workspaceRoot}",
             "name": "PlatformIO Debugger",
-            "target": "d:/Git/rc2018/rc_tft_remote/.pioenvs/nodemcu-32s/firmware.elf",
-            "gdbpath": "C:/Users/Ruoya/.platformio/penv/Scripts/piodebuggdb",
+            "target": "/media/hsury/B230EFB230EF7BAB/Git/rc2018/rc_tft_remote/.pioenvs/nodemcu-32s/firmware.elf",
+            "gdbpath": "/home/hsury/.platformio/penv/bin/piodebuggdb",
             "autorun": [ "source .pioinit" ]
         }
     ]
