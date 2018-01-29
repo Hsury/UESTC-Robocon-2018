@@ -28,14 +28,14 @@
 #include <ArduinoOTA.h>
 #include <RemoteDebug.h>
 #include <BY8X01-16P.h>
+#include "bitmap.h"
 
-#include "bitmap/uestc.h"
-#include "bitmap/robocon.h"
+#define HW_NAME "AutoRobot"
+#define SW_NAME "20180129"
 
 #define ENABLE_TOUCH_CALIBRATE 0
 
 #define VOLUME 5
-#define HOST_NAME "AR"
 #define NOTIFY_DEVICE_NUM 3
 
 #define CAN_TX_PIN GPIO_NUM_5
@@ -96,10 +96,10 @@ uint32_t DeviceNotify[NOTIFY_DEVICE_NUM];
 uint32_t DT35[3]; // Array to save the data of DT35s
 
 TaskHandle_t WiFiStationTaskHandle;
+TaskHandle_t AudioTaskHandle;
 TaskHandle_t TFTTaskHandle;
 TaskHandle_t CANRecvTaskHandle;
 TaskHandle_t UARTRecvTaskHandle;
-TaskHandle_t AudioTaskHandle;
 TaskHandle_t TestTaskHandle;
 TaskHandle_t RobotSelftestTaskHandle;
 
@@ -113,6 +113,9 @@ BY8X0116P audioController(Serial2, AUDIO_BUSY_PIN);
 TFT_eSPI tft = TFT_eSPI();
 RemoteDebug Debug;
 
+boolean isWiFiConnected = false;
+boolean isUpdating = false;
+
 /*
 NOTE: If we create a 16-bit Sprite, 320 x 240 x 2 bytes RAM is occupied, not a good choice
 String UARTHistory[14];
@@ -120,10 +123,10 @@ String CANHistory[14];
 */
 
 void WiFiStationTask(void * pvParameters);
+void AudioTask(void * pvParameters);
 void TFTTask(void * pvParameters);
 void CANRecvTask(void * pvParameters);
 void UARTRecvTask(void * pvParameters);
-void AudioTask(void * pvParameters);
 void TestTask(void * pvParameters);
 void RobotSelftestTask(void * pvParameters);
 
@@ -156,7 +159,7 @@ void setup() {
     tft.setTextFont(2);
 
     WiFi.softAP(AP_SSID, AP_PASSWORD); // Begin AP mode  // ssid_hidden = 1
-    WiFi.softAPsetHostname(HOST_NAME);
+    WiFi.softAPsetHostname(HW_NAME);
     IPAddress APIP = WiFi.softAPIP();
     Serial.println("AP Started");
     Serial.printf(" - SSID: %s\r\n", AP_SSID);
@@ -172,6 +175,7 @@ void setup() {
 
     ArduinoOTA
         .onStart([]() {
+            isUpdating = true;
             String type;
             if (ArduinoOTA.getCommand() == U_FLASH)
                 type = "sketch";
@@ -181,12 +185,14 @@ void setup() {
             Serial.println("Start updating " + type);
         })
         .onEnd([]() {
+            isUpdating = false;
             Serial.println("\nEnd");
         })
         .onProgress([](unsigned int progress, unsigned int total) {
             Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
         })
         .onError([](ota_error_t error) {
+            isUpdating = false;
             Serial.printf("Error[%u]: ", error);
             if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
             else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
@@ -197,7 +203,7 @@ void setup() {
     ArduinoOTA.setMdnsEnabled(false); // If WiFi is not in STA connected status, mDNS fails to start, so disable here
     ArduinoOTA.begin(); // Allow OTA process in AP Mode, default port is 3232
 
-    Debug.begin(HOST_NAME); // Initiaze the telnet server
+    Debug.begin(HW_NAME); // Initiaze the telnet server
     Debug.setResetCmdEnabled(true); // Enable the reset command
     String helpCmd = "play - Drive the speaker\n";
 	helpCmd.concat("uestc - emmmm");
@@ -212,11 +218,12 @@ void setup() {
     AudioFIFO = xQueueCreate(32, sizeof(uint8_t)); // Create a FIFO to buffer the playing request
     SerialFIFO = xQueueCreate(2048, sizeof(char)); // Create a FIFO to buffer Serial data
 
-    xTaskCreate(WiFiStationTask, "WiFi Station Config", 2048, NULL, 2, &WiFiStationTaskHandle);
-    xTaskCreate(TFTTask, "TFT Update", 2048, NULL, 3, &TFTTaskHandle);
-    xTaskCreate(CANRecvTask, "CAN Bus Receive", 2048, NULL, 4, &CANRecvTaskHandle);
-    xTaskCreate(UARTRecvTask, "UART Receive", 2048, NULL, 4, &UARTRecvTaskHandle);
-    xTaskCreate(AudioTask, "Audio Control", 2048, NULL, 1, &AudioTaskHandle);
+    // NOTE: My principle to arrange the priority of tasks is up to the delay in the task, the longer delay, the first you go
+    xTaskCreate(WiFiStationTask, "WiFi Station Config", 2048, NULL, 4, &WiFiStationTaskHandle);
+    xTaskCreate(AudioTask, "Audio Control", 2048, NULL, 3, &AudioTaskHandle);
+    xTaskCreate(TFTTask, "TFT Update", 2048, NULL, 2, &TFTTaskHandle);
+    xTaskCreate(CANRecvTask, "CAN Bus Receive", 2048, NULL, 1, &CANRecvTaskHandle);
+    xTaskCreate(UARTRecvTask, "UART Receive", 2048, NULL, 1, &UARTRecvTaskHandle);
     xTaskCreate(TestTask, "Priority Test", 1024, NULL, 1, &TestTaskHandle);
 
     AddToPlaylist(1); // Play OS started tone
@@ -226,13 +233,13 @@ void loop() {
     // put your main code here, to run repeatedly:
     ArduinoOTA.handle();
     Debug.handle();
-    delay(10); // Maybe we can use yield() to take place of it
+    delay(50); // Maybe we can use yield() to take place of it
 }
 
 void WiFiStationTask(void * pvParameters)
 {
     WiFi.begin(STA_SSID, STA_PASSWORD); // Begin STA mode
-    WiFi.setHostname(HOST_NAME);
+    WiFi.setHostname(HW_NAME);
     uint32_t WiFiTimeout = millis() + 3E4; // Set WiFi STA connection timeout to 30 seconds
     while (WiFi.status() != WL_CONNECTED && millis() < WiFiTimeout)
     {
@@ -240,13 +247,14 @@ void WiFiStationTask(void * pvParameters)
     }
     if (WiFi.status() == WL_CONNECTED)
     {
+        isWiFiConnected = true;
         IPAddress STAIP = WiFi.localIP();
         Serial.println("WiFi connected");
         Serial.printf(" - SSID: %s\r\n", STA_SSID);
         Serial.print(" - IP: ");
         Serial.println(STAIP);
         ArduinoOTA.end();
-        ArduinoOTA.setHostname(HOST_NAME); // Equals to the parameter in function MDNS.begin(HOST_NAME)
+        ArduinoOTA.setHostname(HW_NAME); // Equals to the parameter in function MDNS.begin(HW_NAME)
         ArduinoOTA.setMdnsEnabled(true); // Now STA connected, restart OTA here to enable mDNS
         ArduinoOTA.begin();
         MDNS.addService("telnet", "tcp", 23); // Telnet service (RemoteDebug)
@@ -269,13 +277,14 @@ void WiFiStationTask(void * pvParameters)
         }
         if (WiFi.status() == WL_CONNECTED)
         {
+            isWiFiConnected = true;
             IPAddress STAIP = WiFi.localIP();
             Serial.println("WiFi connected");
             Serial.printf(" - SSID: %s\r\n", WiFi.SSID());
             Serial.print(" - IP: ");
             Serial.println(STAIP);
             ArduinoOTA.end();
-            ArduinoOTA.setHostname(HOST_NAME); // Equals to the parameter in function MDNS.begin(HOST_NAME)
+            ArduinoOTA.setHostname(HW_NAME); // Equals to the parameter in function MDNS.begin(HW_NAME)
             ArduinoOTA.setMdnsEnabled(true); // Now STA connected, restart OTA here to enable mDNS
             ArduinoOTA.begin();
             MDNS.addService("telnet", "tcp", 23); // Telnet service (RemoteDebug)
@@ -291,6 +300,41 @@ void WiFiStationTask(void * pvParameters)
     vTaskDelete(NULL);
 }
 
+void AudioTask(void * pvParameters)
+{
+    /*
+    Audio File List
+
+    001启动音乐.mp3
+    002提示音.mp3
+    003NetworkConnected.mp3
+    004自检开始.mp3
+    005自检通过.mp3
+    006自检未通过.mp3
+    007底盘主控掉线.mp3
+    008云台主控掉线.mp3
+    009陀螺仪与码盘掉线.mp3
+    010号电机掉线.mp3
+    011号激光掉线.mp3
+    012一.mp3
+    013二.mp3
+    014三.mp3
+    015四.mp3
+    */
+    
+    while (1)
+    {
+        uint8_t index;
+        xQueueReceive(AudioFIFO, &index, portMAX_DELAY); // Attempt to get the index in blocking mode
+        while (audioController.isBusy()) delay(25); // Read the Busy Pin of the audio chip
+        audioController.playFileIndex(index);
+        Serial.printf("Begin to play voice %u\r\n", index);
+        DEBUG_I("Begin to play voice %u\r\n", index);
+        delay(250); // Note that the library or the audio chip itself does not support high rate command stream, so wait here
+    }
+    vTaskDelete(NULL);
+}
+
 void TFTTask(void * pvParameters)
 {
     uint8_t scene = 0;
@@ -298,6 +342,7 @@ void TFTTask(void * pvParameters)
     boolean pressed;
     uint16_t xTouch = 0, yTouch = 0; // To store the touch coordinates
     char tmp;
+    uint8_t trayPos = 1; // To store how many icons are shown in the tray (WiFi is always there)
     uint8_t line = 1;
     while (1)
     {
@@ -305,31 +350,71 @@ void TFTTask(void * pvParameters)
         switch (scene)
         {
             case 0: // Booting
-            tft.pushImage((320 - UESTC_WIDTH) / 2, (240 - UESTC_HEIGHT) / 2, UESTC_WIDTH, UESTC_HEIGHT, uestc); // Display UESTC LOGO
+            tft.pushImage((320 - 281) / 2, (240 - 64) / 2, 281, 64, bitmap_uestc); // Display UESTC LOGO
             delay(2500);
-            tft.pushImage((320 - ROBOCON_WIDTH) / 2, (240 - ROBOCON_HEIGHT) / 2, ROBOCON_WIDTH, ROBOCON_HEIGHT, robocon); // Display Robocon 2018 LOGO
+            tft.pushImage((320 - 300) / 2, (240 - 116) / 2, 300, 116, bitmap_robocon); // Display Robocon 2018 LOGO
             delay(2500);
-            tft.fillScreen(TFT_BLACK);
+            tft.pushImage(0, 0, 320, 240, bitmap_main);
+            tft.setCursor(0, 0);
+            tft.printf("HW: %s\r\nSW: %s", HW_NAME, SW_NAME);
             scene = 1;
             break;
 
-            case 1: // Main interface
-            tft.setCursor(0, 50);
+            case 1: // Main page
+            if (isWiFiConnected) tft.pushImage(320 - 24, 0, 24, 24, bitmap_wifi_connected);
+            else tft.pushImage(320 - 24, 0, 24, 24, bitmap_wifi_disconnected);
+            trayPos = 1; // Reset the tray position
+            if (isUpdating)
+            {
+                tft.pushImage(320 - 24 * (trayPos + 1), 0, 24, 24, bitmap_update);
+                trayPos++;
+            }
+            if (Debug.isActive(Debug.ANY))
+            {
+                tft.pushImage(320 - 24 * (trayPos + 1), 0, 24, 24, bitmap_debug);
+                trayPos++;
+            }
+            tft.fillRect(320 - 24 * (5 + 1), 0, 24 * (5 - trayPos + 1), 24, TFT_BLACK); // Erase icons left, assumes that the maximum number of icons is 5 (exclude WiFi)
+            tft.setCursor(0, 32);
+            tft.printf("MS: %u", millis());
+            break;
+
+            case 2: // Selftest
+            tft.setCursor(100, 32);
+            tft.print("Selftest Page");
+            tft.pushImage(100, (240 - 32) / 2, 32, 32, bitmap_pass, TFT_BLACK); // Make black as transparent color
+            tft.pushImage(200, (240 - 32) / 2, 32, 32, bitmap_fail, TFT_BLACK); // Make black as transparent color
+            break;
+
+            case 3: // Variable
+            tft.setCursor(100, 32);
+            tft.print("Variable Page");
+            tft.setCursor(0, 64);
             tft.println("DT35 Debug Tool");
             tft.setCursor(0, 100);
+            tft.fillRect(0, 100, 200, 48, TFT_BLACK);
             tft.printf("Head: %u\r\n", DT35[0]);
             tft.printf("Front: %u\r\n", DT35[1]);
             tft.printf("Rear: %u\r\n", DT35[2]);
+            tft.pushImage(200, 120, 48, 48, bitmap_prev, TFT_BLACK);
+            tft.pushImage(260, 120, 48, 48, bitmap_next, TFT_BLACK);
+            break;
+
+            case 4: // Settings
+            tft.setCursor(100, 32);
+            tft.print("Settings Page");
+            tft.pushImage(100, 120, 54, 32, bitmap_switch_on, TFT_BLACK);
+            tft.pushImage(180, 120, 54, 32, bitmap_switch_off, TFT_BLACK);
+            break;
+
+            case 5: // Log
+            tft.setCursor(100, 32);
+            tft.print("Log Page");
             break;
             
-            case 2: // CAN Bus Monitor interface
+            case 6: // CAN Bus Monitor interface
             if (ulTaskNotifyTake(pdTRUE, 0)) // If task is notified, which means that a new CAN frame has come, refresh the screen
             {
-                if (yPos >= 240)
-                {
-                    tft.fillRect(0, 16, 320, 224, TFT_BLACK);
-                    yPos = 16;
-                }
                 tft.setCursor(0, yPos);
                 tft.printf("%u, ID: %d, Data: ", packNum, rx_frame.MsgID);
                 for (uint8_t i = 0; i < rx_frame.FIR.B.DLC; i++)
@@ -337,21 +422,26 @@ void TFTTask(void * pvParameters)
                     tft.printf("%02x ", rx_frame.data.u8[i]);
                 }
                 yPos += 16;
+                if (yPos >= 240) yPos = 16;
+                tft.fillRect(0, yPos, 320, 16, TFT_BLACK);
             }
             break;
 
-            case 3: // Serial Terminal interface
+            case 7: // UART Monitor interface
             while (xQueueReceive(SerialFIFO, &tmp, 0) == pdTRUE)
             {
-                if (yPos >= 240)
-                {
-                    tft.fillRect(0, 16, 320, 224, TFT_BLACK);
-                    xPos = 0;
-                    yPos = 16;
-                }
-                if (tmp > 31 && tmp < 128) xPos += tft.drawChar(tmp, xPos, yPos); // Char can be displayed
+                if (tmp > 31 && tmp < 128) xPos += tft.drawChar(tmp, xPos, yPos); // Char which can be displayed
                 if (tmp == '\r') xPos = 0; // Return
-                if (tmp == '\n') yPos += 16; // New Line
+                if (tmp == '\n') // New Line
+                {
+                    yPos += 16;
+                    if (yPos >= 240)
+                    {
+                        xPos = 0;
+                        yPos = 16;
+                    }
+                    tft.fillRect(0, yPos, 320, 16, TFT_BLACK);
+                }
             }
             break;
         }
@@ -364,44 +454,69 @@ void TFTTask(void * pvParameters)
             switch (scene)
             {
                 case 1:
-                tft.fillScreen(TFT_BLACK); // Clear screen
-                tft.fillRect(0, 0, 320, 16, TFT_RED); // Draw red title bar
-                tft.setTextColor(TFT_WHITE, TFT_RED);
-                tft.setTextDatum(CC_DATUM); // Text align to Centre-Centre, same as MC_DATUM
-                tft.drawString("CAN Bus Monitor", 160 , 8);
-                tft.setTextColor(TFT_WHITE, TFT_BLACK);
-                tft.setTextDatum(TL_DATUM); // Text align to Top-Left
-                xPos = 0;
-                yPos = 16;
-                scene = 2;
+                if (xTouch >= 13 && xTouch <= 152 && yTouch >= 57 && yTouch <= 106) // Selftest
+                {
+                    if (RobotSelftestTaskHandle == NULL)
+                    {
+                        Serial.println("Robot Selftest task began");
+                        xTaskCreate(RobotSelftestTask, "Robot Selftest Control", 2048, NULL, 5, &RobotSelftestTaskHandle);
+                    }
+                    tft.fillScreen(TFT_BLACK); // Clear screen
+                    scene = 2;
+                }
+                else if (xTouch >= 167 && xTouch <= 306 && yTouch >= 57 && yTouch <= 106) // Variable
+                {
+                    tft.fillScreen(TFT_BLACK); // Clear screen
+                    scene = 3;
+                }
+                else if (xTouch >= 13 && xTouch <= 152 && yTouch >= 117 && yTouch <= 166) // Settings
+                {
+                    tft.fillScreen(TFT_BLACK); // Clear screen
+                    scene = 4;
+                }
+                else if (xTouch >= 167 && xTouch <= 306 && yTouch >= 117 && yTouch <= 166) // Log
+                {
+                    tft.fillScreen(TFT_BLACK); // Clear screen
+                    scene = 5;
+                }
+                else if (xTouch >= 13 && xTouch <= 152 && yTouch >= 177 && yTouch <= 226) // CAN
+                {
+                    tft.fillScreen(TFT_BLACK); // Clear screen
+                    tft.fillRect(0, 0, 320, 16, TFT_RED); // Draw red title bar
+                    tft.setTextColor(TFT_WHITE, TFT_RED);
+                    tft.setTextDatum(CC_DATUM); // Text align to Centre-Centre, same as MC_DATUM
+                    tft.drawString("CAN Bus Monitor", 160 , 8);
+                    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                    tft.setTextDatum(TL_DATUM); // Text align to Top-Left
+                    xPos = 0;
+                    yPos = 16;
+                    scene = 6;
+                }
+                else if (xTouch >= 167 && xTouch <= 306 && yTouch >= 177 && yTouch <= 226) // UART
+                {
+                    tft.fillScreen(TFT_BLACK); // Clear screen
+                    tft.fillRect(0, 0, 320, 16, TFT_BLUE); // Draw blue title bar
+                    tft.setTextColor(TFT_WHITE, TFT_BLUE);
+                    tft.setTextDatum(CC_DATUM); // Text align to Centre-Centre, same as MC_DATUM
+                    tft.drawString("UART Monitor", 160 , 8);
+                    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                    tft.setTextDatum(TL_DATUM); // Text align to Top-Left
+                    xPos = 0;
+                    yPos = 16;
+                    scene = 7;
+                }
                 break;
 
-                case 2:
-                tft.fillScreen(TFT_BLACK); // Clear screen
-                tft.fillRect(0, 0, 320, 16, TFT_BLUE); // Draw blue title bar
-                tft.setTextColor(TFT_WHITE, TFT_BLUE);
-                tft.setTextDatum(CC_DATUM); // Text align to Centre-Centre, same as MC_DATUM
-                tft.drawString("Serial Terminal - 115200 baud", 160 , 8);
-                tft.setTextColor(TFT_WHITE, TFT_BLACK);
-                tft.setTextDatum(TL_DATUM); // Text align to Top-Left
-                xPos = 0;
-                yPos = 16;
-                scene = 3;
-                break;
-
-                case 3:
-                tft.fillScreen(TFT_BLACK); // Clear screen
+                default: // Go back to main page
+                tft.pushImage(0, 0, 320, 240, bitmap_main);
+                tft.setCursor(0, 0);
+                tft.printf("HW: %s\r\nSW: %s", HW_NAME, SW_NAME);
                 scene = 1;
                 break;
             }
-            if (RobotSelftestTaskHandle == NULL)
-            {
-                Serial.println("Robot Selftest task began");
-                xTaskCreate(RobotSelftestTask, "Robot Selftest Control", 2048, NULL, 5, &RobotSelftestTaskHandle);
-            }            
             delay(100);
         }
-        delay(10);
+        delay(25);
     }
     vTaskDelete(NULL);
 }
@@ -456,7 +571,6 @@ void CANRecvTask(void * pvParameters)
             Serial.println();
             Serial.println("-------------------------");
         }
-        //delay(1);
     }
     vTaskDelete(NULL);
 }
@@ -471,41 +585,6 @@ void UARTRecvTask(void * pvParameters)
             tmp = Serial.read();
             xQueueSend(SerialFIFO, &tmp, 0); // Insert item into the queue
         }
-    }
-    vTaskDelete(NULL);
-}
-
-void AudioTask(void * pvParameters)
-{
-    /*
-    Audio File List
-
-    001启动音乐.mp3
-    002提示音.mp3
-    003NetworkConnected.mp3
-    004自检开始.mp3
-    005自检通过.mp3
-    006自检未通过.mp3
-    007底盘主控掉线.mp3
-    008云台主控掉线.mp3
-    009陀螺仪与码盘掉线.mp3
-    010号电机掉线.mp3
-    011号激光掉线.mp3
-    012一.mp3
-    013二.mp3
-    014三.mp3
-    015四.mp3
-    */
-    
-    while (1)
-    {
-        uint8_t index;
-        xQueueReceive(AudioFIFO, &index, portMAX_DELAY); // Attempt to get the index in blocking mode
-        while (audioController.isBusy()) delay(25); // Read the Busy Pin of the audio chip
-        audioController.playFileIndex(index);
-        Serial.printf("Begin to play voice %u\r\n", index);
-        DEBUG_I("Begin to play voice %u\r\n", index);
-        delay(250); // Note that the library or the audio chip itself does not support high rate command stream, so wait here
     }
     vTaskDelete(NULL);
 }
