@@ -13,7 +13,7 @@
                         ===== UESTC Robot Probe For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/01/30
+                                        VERSION 2018/01/31
 
 */
 
@@ -35,7 +35,7 @@
 #include "bitmap.h"
 
 #define HW_NAME "AutoRobot"
-#define SW_NAME "20180130"
+#define SW_NAME "20180131"
 
 #define ENABLE_TOUCH_CALIBRATE 0
 #define NOTIFY_DEVICE_NUM 3
@@ -125,17 +125,16 @@ TaskHandle_t RobotSelftestTaskHandle;
 xQueueHandle AudioFIFO;
 xQueueHandle SerialFIFO;
 
+//To learn more about Arduino String Class, see also https://hackingmajenkoblog.wordpress.com/2016/02/04/the-evils-of-arduino-strings/
+String LogHistory[13 * 20]; // Record for 20 pages at most
+uint16_t LogPtr = 0;
 uint32_t DeviceNotify[NOTIFY_DEVICE_NUM];
 uint32_t DT35[3]; // Array to save the data of DT35s
 boolean isWiFiConnected = false;
 boolean isUpdating = false;
 boolean isSDCardInserted = false;
 
-/*
-NOTE: If we create a 16-bit Sprite, 320 x 240 x 2 bytes RAM is occupied, not a good choice
-String UARTHistory[14];
-String CANHistory[14];
-*/
+// NOTE: If we create a 16-bit Sprite, 320 x 240 x 2 bytes RAM is occupied, not a good choice
 
 void WiFiStationTask(void * pvParameters);
 void AudioTask(void * pvParameters);
@@ -149,6 +148,8 @@ void AddToPlaylist(uint8_t index);
 void TouchscreenCalibrate();
 void readConfig();
 void writeConfig();
+
+void Log(const char * format, ...);
 
 void setup() {
     Serial.begin(115200);
@@ -165,7 +166,7 @@ void setup() {
     CAN_cfg.rx_queue = xQueueCreate(10, sizeof(CAN_frame_t)); // Create CAN RX Queue
     ESP32Can.CANInit(); // Start CAN module
 
-    if (SPIFFS.begin(true)) Serial.println("SPIFFS mounted"); // Format SPIFFS on fail is enabled
+    if (SPIFFS.begin(true)) Log("SPIFFS mounted"); // Format SPIFFS on fail is enabled
     readConfig(); // Load config
 
     /*
@@ -187,11 +188,10 @@ void setup() {
     WiFi.softAP(AP_SSID, AP_PASSWORD, 1, config.hideSSID); // Begin AP mode
     WiFi.softAPsetHostname(HW_NAME);
     IPAddress APIP = WiFi.softAPIP();
-    Serial.println("AP started");
-    Serial.printf(" - SSID: %s\r\n", AP_SSID);
-    Serial.printf(" - Password: %s\r\n", AP_PASSWORD);
-    Serial.print(" - IP: ");
-    Serial.println(APIP);
+    Log("AP started");
+    Log(" - SSID: %s", AP_SSID);
+    Log(" - Password: %s", AP_PASSWORD);
+    Log(" - IP: %u.%u.%u.%u", APIP[0], APIP[1], APIP[2], APIP[3]);
     
     if (SD.begin(SD_CARD_CS_PIN, SPI2)) // Detect SD Card
     {
@@ -199,16 +199,15 @@ void setup() {
         if (cardType != CARD_NONE)
         {
             isSDCardInserted = true;
-            Serial.println("SD Card mounted");
-            Serial.print(" - Type: ");
-            if (cardType == CARD_MMC) Serial.println("MMC");
-            else if (cardType == CARD_SD) Serial.println("SDSC");
-            else if (cardType == CARD_SDHC) Serial.println("SDHC");
-            else if (cardType == CARD_UNKNOWN) Serial.println("UNKNOWN");
+            Log("SD Card mounted");
+            if (cardType == CARD_MMC) Log(" - Type: MMC");
+            else if (cardType == CARD_SD) Log(" - Type: SDSC");
+            else if (cardType == CARD_SDHC) Log(" - Type: SDHC");
+            else if (cardType == CARD_UNKNOWN) Log(" - Type: UNKNOWN");
             uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-            Serial.printf(" - Size: %llu MB\r\n", cardSize);
-            Serial.printf(" - Total: %llu MB\r\n", SD.totalBytes() / (1024 * 1024));
-            Serial.printf(" - Used: %llu MB\r\n", SD.usedBytes() / (1024 * 1024));
+            Log(" - Size: %llu MB", cardSize);
+            Log(" - Total: %llu MB", SD.totalBytes() / (1024 * 1024));
+            Log(" - Used: %llu MB", SD.usedBytes() / (1024 * 1024));
         }
     }
     // NOTE: ESP32 has MMC Controller, not using here mainly because it needs more pins and the pins cannot be remapped
@@ -221,29 +220,26 @@ void setup() {
     ArduinoOTA
         .onStart([]() {
             isUpdating = true;
-            String type;
             if (ArduinoOTA.getCommand() == U_FLASH)
-                type = "sketch";
+                Log("Start updating sketch");
             else // U_SPIFFS
-                type = "filesystem";
+                Log("Start updating filesystem");
             // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-            Serial.println("Start updating " + type);
         })
         .onEnd([]() {
             isUpdating = false;
-            Serial.println("\nEnd");
+            Log("OTA end");
         })
         .onProgress([](unsigned int progress, unsigned int total) {
-            Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+            Log("OTA Progress: %u%%", (progress / (total / 100)));
         })
         .onError([](ota_error_t error) {
             isUpdating = false;
-            Serial.printf("Error[%u]: ", error);
-            if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-            else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-            else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-            else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-            else if (error == OTA_END_ERROR) Serial.println("End Failed");
+            if (error == OTA_AUTH_ERROR) Log("OTA Error[%u]: Auth Failed", error);
+            else if (error == OTA_BEGIN_ERROR) Log("OTA Error[%u]: Begin Failed", error);
+            else if (error == OTA_CONNECT_ERROR) Log("OTA Error[%u]: Connect Failed", error);
+            else if (error == OTA_RECEIVE_ERROR) Log("OTA Error[%u]: Receive Failed", error);
+            else if (error == OTA_END_ERROR) Log("OTA Error[%u]: End Failed", error);
         });
     ArduinoOTA.setMdnsEnabled(false); // If WiFi is not in STA connected status, mDNS fails to start, so disable here
     ArduinoOTA.begin(); // Allow OTA process in AP Mode, default port is 3232
@@ -264,7 +260,7 @@ void setup() {
     xTaskCreate(TFTTask, "TFT Update", 4096, NULL, 2, &TFTTaskHandle);
     xTaskCreate(CANRecvTask, "CAN Bus Receive", 2048, NULL, 1, &CANRecvTaskHandle);
     xTaskCreate(UARTRecvTask, "UART Receive", 2048, NULL, 1, &UARTRecvTaskHandle);
-    xTaskCreate(TestTask, "Priority Test", 1024, NULL, 1, &TestTaskHandle);
+    xTaskCreate(TestTask, "Priority Test", 2048, NULL, 1, &TestTaskHandle);
 
     AddToPlaylist(1); // Play OS started tone
 }
@@ -288,10 +284,9 @@ void WiFiStationTask(void * pvParameters)
     {
         isWiFiConnected = true;
         IPAddress STAIP = WiFi.localIP();
-        Serial.println("WiFi connected");
-        Serial.printf(" - SSID: %s\r\n", STA_SSID);
-        Serial.print(" - IP: ");
-        Serial.println(STAIP);
+        Log("WiFi connected");
+        Log(" - SSID: %s", STA_SSID);
+        Log(" - IP: %u.%u.%u.%u", STAIP[0], STAIP[1], STAIP[2], STAIP[3]);
         ArduinoOTA.end();
         ArduinoOTA.setHostname(HW_NAME); // Equals to the parameter in function MDNS.begin(HW_NAME)
         ArduinoOTA.setMdnsEnabled(true); // Now STA connected, restart OTA here to enable mDNS
@@ -302,13 +297,13 @@ void WiFiStationTask(void * pvParameters)
     }
     else
     {
-        Serial.println("WiFi connected failed, SmartConfig begin");
+        Log("WiFi connected failed, SmartConfig begin");
         WiFi.beginSmartConfig();
         while (!WiFi.smartConfigDone()) // SmartConfig packet received
         {
             delay(500);
         }
-        Serial.println("SmartConfig received");
+        Log("SmartConfig received");
         WiFiTimeout = millis() + 3E4;
         while (WiFi.status() != WL_CONNECTED && millis() < WiFiTimeout)
         {
@@ -318,10 +313,9 @@ void WiFiStationTask(void * pvParameters)
         {
             isWiFiConnected = true;
             IPAddress STAIP = WiFi.localIP();
-            Serial.println("WiFi connected");
-            Serial.printf(" - SSID: %s\r\n", WiFi.SSID());
-            Serial.print(" - IP: ");
-            Serial.println(STAIP);
+            Log("WiFi connected");
+            Log(" - SSID: %s", WiFi.SSID());
+            Log(" - IP: %u.%u.%u.%u", STAIP[0], STAIP[1], STAIP[2], STAIP[3]);
             ArduinoOTA.end();
             ArduinoOTA.setHostname(HW_NAME); // Equals to the parameter in function MDNS.begin(HW_NAME)
             ArduinoOTA.setMdnsEnabled(true); // Now STA connected, restart OTA here to enable mDNS
@@ -332,7 +326,7 @@ void WiFiStationTask(void * pvParameters)
         }
         else
         {
-            Serial.println("WiFi connected failed, Stop");
+            Log("WiFi connected failed, Stop");
             WiFi.mode(WIFI_AP);
         }
     }
@@ -367,8 +361,7 @@ void AudioTask(void * pvParameters)
         xQueueReceive(AudioFIFO, &index, portMAX_DELAY); // Attempt to get the index in blocking mode
         while (audioController.isBusy()) delay(25); // Read the Busy Pin of the audio chip
         audioController.playFileIndex(index);
-        Serial.printf("Begin to play voice %u\r\n", index);
-        DEBUG_I("Begin to play voice %u\r\n", index);
+        Log("Begin to play voice %u", index);
         delay(250); // Note that the library or the audio chip itself does not support high rate command stream, so wait here
     }
     vTaskDelete(NULL);
@@ -382,7 +375,9 @@ void TFTTask(void * pvParameters)
     uint16_t xTouch = 0, yTouch = 0; // To store the touch coordinates
     char tmp;
     uint8_t trayPos = 1; // To store how many icons are shown in the tray (WiFi is always there)
-    uint8_t line = 1;
+    boolean pause = false; // Whether to pause refresh in a page
+    uint8_t LogPage = 1;
+    boolean LogFollow = true;
     while (1)
     {
         // Display control code is below
@@ -431,6 +426,7 @@ void TFTTask(void * pvParameters)
             break;
 
             case 3: // @Variable
+            /*
             tft.setCursor(100, 32);
             tft.print("Variable Page");
             tft.setCursor(0, 64);
@@ -440,21 +436,33 @@ void TFTTask(void * pvParameters)
             tft.printf("Head: %u\r\n", DT35[0]);
             tft.printf("Front: %u\r\n", DT35[1]);
             tft.printf("Rear: %u\r\n", DT35[2]);
-            tft.pushImage(200, 120, 48, 48, bitmap_prev, TFT_BLACK);
-            tft.pushImage(260, 120, 48, 48, bitmap_next, TFT_BLACK);
+            tft.pushImage(200, 120, 32, 32, bitmap_prev, TFT_BLACK);
+            tft.pushImage(260, 120, 32, 32, bitmap_next, TFT_BLACK);
+            */
             break;
 
             case 4: // @Settings
-            
             break;
 
             case 5: // @Log
-            tft.setCursor(100, 32);
-            tft.print("Log Page");
+            if (ulTaskNotifyTake(pdTRUE, 0) == 1)
+            {
+                if (LogFollow) LogPage = (LogPtr - 1) / 13 + 1; // [0, 13] => 1; [14, 26] => 2
+                tft.setTextDatum(CC_DATUM);
+                tft.fillRect(64, 0, 192, 32, TFT_BLACK);
+                tft.drawString("Page " + String(LogPage) + "/" + String((LogPtr - 1) / 13 + 1) + ", " + String(LogPtr) + " records", 160 , 16);
+                tft.setTextDatum(TL_DATUM);
+                tft.setCursor(0, 32);
+                for (uint8_t i = 0; i < 13; i++)
+                {
+                    tft.fillRect(0, 32 + i * 16, 320, 16, TFT_BLACK);
+                    tft.println(LogHistory[i + (LogPage - 1) * 13]);
+                }
+            }
             break;
             
             case 6: // @CAN Bus Monitor interface
-            if (ulTaskNotifyTake(pdTRUE, 0)) // If task is notified, which means that a new CAN frame has come, refresh the screen
+            if (!pause && ulTaskNotifyTake(pdTRUE, 0) == 2) // If task is notified, which means that a new CAN frame has come, refresh the screen
             {
                 tft.setCursor(0, yPos);
                 tft.printf("%u, ID: %d, Data: ", packNum, rx_frame.MsgID);
@@ -469,10 +477,10 @@ void TFTTask(void * pvParameters)
             break;
 
             case 7: // @UART Monitor interface
-            while (xQueueReceive(SerialFIFO, &tmp, 0) == pdTRUE)
+            while (!pause && xQueueReceive(SerialFIFO, &tmp, 0) == pdTRUE)
             {
                 if (tmp > 31 && tmp < 128) xPos += tft.drawChar(tmp, xPos, yPos); // Char which can be displayed
-                if (tmp == '\r') xPos = 0; // Return
+                if (tmp == '\r') xPos = 0; // Home
                 if (tmp == '\n') // New Line
                 {
                     yPos += 16;
@@ -490,7 +498,7 @@ void TFTTask(void * pvParameters)
         pressed = tft.getTouch(&xTouch, &yTouch); 
         if (pressed)
         {
-            Serial.printf("Touch, x=%u, y=%u\r\n", xTouch, yTouch);
+            //Log("Touch, x=%u, y=%u", xTouch, yTouch);
             //tft.fillCircle(x, y, 2, TFT_WHITE);
             switch (scene)
             {
@@ -499,22 +507,26 @@ void TFTTask(void * pvParameters)
                 {
                     if (RobotSelftestTaskHandle == NULL)
                     {
-                        Serial.println("Robot Selftest task began");
+                        Log("Robot Selftest task began");
                         xTaskCreate(RobotSelftestTask, "Robot Selftest Control", 2048, NULL, 5, &RobotSelftestTaskHandle);
                     }
                     tft.fillScreen(TFT_BLACK);
+                    tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
+                    tft.pushImage(288, 0, 32, 32, bitmap_refresh, TFT_BLACK);
                     scene = 2;
                 }
                 else if (xTouch >= 167 && xTouch <= 306 && yTouch >= 57 && yTouch <= 106) // => Variable
                 {
                     tft.fillScreen(TFT_BLACK);
+                    tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
+                    tft.pushImage(288, 0, 32, 32, bitmap_record_begin, TFT_BLACK);
                     scene = 3;
                 }
                 else if (xTouch >= 13 && xTouch <= 152 && yTouch >= 117 && yTouch <= 166) // => Settings
                 {
                     tft.fillScreen(TFT_BLACK);
-                    tft.pushImage(4, 4, 32, 32, bitmap_home, TFT_BLACK);
-                    tft.pushImage(284, 4, 32, 32, bitmap_power, TFT_BLACK);
+                    tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
+                    tft.pushImage(288, 0, 32, 32, bitmap_power, TFT_BLACK);
                     tft.setFreeFont(&FreeSans9pt7b);
 
                     tft.setTextDatum(R_BASELINE);
@@ -536,6 +548,15 @@ void TFTTask(void * pvParameters)
                 else if (xTouch >= 167 && xTouch <= 306 && yTouch >= 117 && yTouch <= 166) // => Log
                 {
                     tft.fillScreen(TFT_BLACK);
+                    tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
+                    tft.pushImage(32, 0, 32, 32, bitmap_prev, TFT_BLACK);
+                    tft.setTextDatum(CC_DATUM);
+                    tft.drawString("Page " + String(LogPage) + "/" + String((LogPtr - 1) / 13 + 1) + ", " + String(LogPtr) + " records", 160 , 16);
+                    tft.setTextDatum(TL_DATUM);
+                    tft.pushImage(256, 0, 32, 32, bitmap_next, TFT_BLACK);
+                    tft.pushImage(288, 0, 32, 32, bitmap_clear, TFT_BLACK);
+                    LogPage = (LogPtr - 1) / 13 + 1;
+                    LogFollow = true;
                     scene = 5;
                 }
                 else if (xTouch >= 13 && xTouch <= 152 && yTouch >= 177 && yTouch <= 226) // => CAN
@@ -549,6 +570,7 @@ void TFTTask(void * pvParameters)
                     tft.setTextDatum(TL_DATUM); // Text align to Top-Left
                     xPos = 0;
                     yPos = 16;
+                    pause = false;
                     scene = 6;
                 }
                 else if (xTouch >= 167 && xTouch <= 306 && yTouch >= 177 && yTouch <= 226) // => UART
@@ -562,12 +584,15 @@ void TFTTask(void * pvParameters)
                     tft.setTextDatum(TL_DATUM); // Text align to Top-Left
                     xPos = 0;
                     yPos = 16;
+                    pause = false;
                     scene = 7;
                 }
                 break;
 
                 case 4: // @Settings
-                if (xTouch >= 160 && xTouch <= 192 && yTouch >= 28 && yTouch <= 60) // Volume down
+                if (xTouch >= 0 && xTouch <= 32 && yTouch >= 0 && yTouch <= 32) goto Home; // Home
+                else if (xTouch >= 288 && xTouch <= 320 && yTouch >= 0 && yTouch <= 32) ESP.restart(); // Reboot
+                else if (xTouch >= 160 && xTouch <= 192 && yTouch >= 28 && yTouch <= 60) // Volume down
                 {
                     if (config.volume > 0) config.volume--;
                     tft.fillRect(192, 28, 32, 32, TFT_BLACK);
@@ -578,7 +603,6 @@ void TFTTask(void * pvParameters)
                     tft.setTextDatum(TL_DATUM);
                     audioController.setVolume(config.volume);
                     writeConfig();
-                    break;
                 }
                 else if (xTouch >= 224 && xTouch <= 256 && yTouch >= 28 && yTouch <= 60) // Volume up
                 {
@@ -591,7 +615,6 @@ void TFTTask(void * pvParameters)
                     tft.setTextDatum(TL_DATUM);
                     audioController.setVolume(config.volume);
                     writeConfig();
-                    break;
                 }
                 else if (xTouch >= 160 && xTouch <= 214 && yTouch >= 64 && yTouch <= 96) // Switch whether to hide SSID
                 {
@@ -599,12 +622,65 @@ void TFTTask(void * pvParameters)
                     if (config.hideSSID) tft.pushImage(160, 64, 54, 32, bitmap_switch_on, TFT_BLACK);
                     else tft.pushImage(160, 64, 54, 32, bitmap_switch_off, TFT_BLACK);
                     writeConfig();
-                    break;
                 }
-                else if (xTouch >= 284 && xTouch <= 316 && yTouch >= 4 && yTouch <= 36) ESP.restart(); // Reboot
-                else if (xTouch >= 4 && xTouch <= 36 && yTouch >= 4 && yTouch <= 36); // Home
-                else break; // Do not response to blank zone
+                break; // Do not response to blank zone
 
+                case 5: // @Log
+                if (xTouch >= 0 && xTouch <= 32 && yTouch >= 0 && yTouch <= 32) goto Home; // Home
+                else if (xTouch >= 32 && xTouch <= 64 && yTouch >= 0 && yTouch <= 32) // Previous page
+                {
+                    LogFollow = false;
+                    if (LogPage > 1) LogPage--;
+                    else LogPage = (LogPtr - 1) / 13 + 1;
+                }
+                else if (xTouch >= 64 && xTouch <= 256 && yTouch >= 0 && yTouch <= 32) // Goto latest page
+                {
+                    LogFollow = true;
+                }
+                else if (xTouch >= 256 && xTouch <= 288 && yTouch >= 0 && yTouch <= 32) // Next page
+                {
+                    LogFollow = false;
+                    if (LogPage < (LogPtr - 1) / 13 + 1) LogPage++;
+                    else LogPage = 1;
+                }
+                else if (xTouch >= 288 && xTouch <= 320 && yTouch >= 0 && yTouch <= 32) // Clear, should optimize later
+                {
+                    LogFollow = true;
+                    for (uint16_t i = 0; i < 260; i++) LogHistory[i] = "";
+                    LogPtr = 0;
+                }
+                xTaskNotify(TFTTaskHandle, 1, eSetValueWithOverwrite);
+                break;
+
+                case 6: // @CAN
+                if (xTouch >= 0 && xTouch <= 320 && yTouch >= 0 && yTouch <= 16) goto Home; // Tap the title bar to return
+                else
+                {
+                    pause = !pause;
+                    if (pause) // Draw pause icon
+                    {
+                        tft.fillRect(306, 2, 4, 12, TFT_WHITE);
+                        tft.fillRect(314, 2, 4, 12, TFT_WHITE);
+                    }
+                    else tft.fillRect(306, 2, 12, 12, TFT_RED);
+                }
+                break;
+
+                case 7: // @UART
+                if (xTouch >= 0 && xTouch <= 320 && yTouch >= 0 && yTouch <= 16) goto Home; // Tap the title bar to return
+                else
+                {
+                    pause = !pause;
+                    if (pause) // Draw pause icon
+                    {
+                        tft.fillRect(306, 2, 4, 12, TFT_WHITE);
+                        tft.fillRect(314, 2, 4, 12, TFT_WHITE);
+                    }
+                    else tft.fillRect(306, 2, 12, 12, TFT_BLUE);
+                }
+                break;
+
+                Home:
                 default: // => Main
                 tft.pushImage(0, 0, 320, 240, bitmap_main);
                 tft.setCursor(0, 0);
@@ -621,7 +697,6 @@ void TFTTask(void * pvParameters)
 
 void CANRecvTask(void * pvParameters)
 {
-    Serial.println("Waiting for CAN Bus Data...");
     while (1)
     {
         if (xQueueReceive(CAN_cfg.rx_queue, &rx_frame, 3 * portTICK_PERIOD_MS) == pdTRUE)
@@ -650,7 +725,7 @@ void CANRecvTask(void * pvParameters)
                     break;
                 }
             }
-            xTaskNotifyGive(TFTTaskHandle); // TEST now, print CAN Bus information on the screen
+            if (TFTTaskHandle) xTaskNotify(TFTTaskHandle, 2, eSetValueWithOverwrite); //xTaskNotifyGive(TFTTaskHandle);
             Serial.println("-------------------------");
             Serial.printf("Pack Number: %u\r\n", packNum);
             Serial.print("Type: ");
@@ -691,8 +766,7 @@ void TestTask(void * pvParameters)
 {
     while (1)
     {
-        Serial.print("Prio Test, Timestamp = ");
-        Serial.println(millis());
+        Log("Time: %u", millis());
         delay(1000);
     }
     vTaskDelete(NULL);
@@ -727,7 +801,7 @@ void RobotSelftestTask(void * pvParameters)
         AddToPlaylist(6);
         for (uint8_t i = 1; i <= NOTIFY_DEVICE_NUM; i++)
         {
-            if (!isOnline[i]) Serial.printf("Device %u is offline\r\n", i); // Later will change to AddToPlaylist()
+            if (!isOnline[i]) Log("Device %u is offline", i); // Later will change to AddToPlaylist()
         }
     }
     delay(2500); // Wait for a short time
@@ -742,7 +816,7 @@ void processCmdRemoteDebug()
     {
         if (Debug.isActive(Debug.ANY))
         {
-            Debug.println("OK, let's make it!");
+            Log("OK, let's make it!");
             DEBUG_V("* This is a message of debug level VERBOSE\n");
             DEBUG_D("* This is a message of debug level DEBUG\n");
             DEBUG_I("* This is a message of debug level INFO\n");
@@ -764,21 +838,15 @@ void AddToPlaylist(uint8_t index)
 void TouchscreenCalibrate()
 {
     uint16_t calData[5];
-    Serial.println("Touchscreen calibration began");
+    Log("Touchscreen calibration began");
     tft.fillScreen(TFT_BLACK);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.drawCentreString("Touch corners as indicated", tft.width() / 2, tft.height() / 2, 2);
     tft.calibrateTouch(calData, TFT_MAGENTA, TFT_BLACK, 15);
-    Serial.println("The calibration code in setup() is shown below:");
-    Serial.print("    uint16_t calData[5] = {");
-    for (uint8_t i = 0; i < 5; i++)
-    {
-        Serial.print(calData[i]);
-        if (i < 4) Serial.print(", ");
-    }
-    Serial.println("};");
-    Serial.println("    tft.setTouch(calData);");
-    Serial.println("Touchscreen calibration finished");
+    Log("The calibration code in setup() is shown below:");
+    Log("    uint16_t calData[5] = {%u, %u, %u, %u, %u};", calData[0], calData[1], calData[2], calData[3], calData[4]);
+    Log("    tft.setTouch(calData);");
+    Log("Touchscreen calibration finished");
 }
 #endif
 
@@ -789,15 +857,15 @@ void readConfig()
     {
         File internalConfigFile = SPIFFS.open("/config.json");
         JsonObject &root = jsonBuffer.parseObject(internalConfigFile); // Parse internal JSON config file
-        if (root.success()) Serial.println("Config loaded from SPIFFS");
-        else Serial.println("Config cannot be loaded from SPIFFS");
+        if (root.success()) Log("Config loaded from SPIFFS");
+        else Log("Config cannot be loaded from SPIFFS");
         config.volume = root["volume"] | 5; // An interesting approach to load default value while JSON parse error
         config.hideSSID = root["hideSSID"] | false;
         internalConfigFile.close(); // Close the file (File's destructor doesn't close the file)
     }
     else // Config file not found
     {
-        Serial.println("Cannot find config file in SPIFFS");
+        Log("Cannot find config file in SPIFFS");
         writeConfig(); // Save default config to SPIFFS
     }
 }
@@ -810,7 +878,31 @@ void writeConfig()
     JsonObject &root = jsonBuffer.createObject();
     root["volume"] = config.volume;
     root["hideSSID"] = config.hideSSID;
-    if (root.printTo(internalConfigFile)) Serial.println("Config saved to SPIFFS");
-    else Serial.println("Config cannot be saved to SPIFFS");
+    if (root.printTo(internalConfigFile)) Log("Config saved to SPIFFS");
+    else Log("Config cannot be saved to SPIFFS");
     internalConfigFile.close();
+}
+
+void Log(const char * format, ...) // Customized printf based logging function
+{
+    char buf[128]; // Resulting string limitted to 128 chars
+    va_list vargs;
+    va_start(vargs, format);
+    // Cannot use printf here, use vprintf(format, vargs) instead
+    vsnprintf(buf, 128, format, vargs);
+    Serial.printf(buf);
+    Serial.printf("\r\n");
+    if (Debug.isActive(Debug.ANY))
+    {
+        Debug.printf(buf);
+        Debug.printf("\r\n");
+    }
+    if (LogPtr >= 260)
+    {
+        for (uint16_t i = 0; i < 260; i++) LogHistory[i] = ""; // Free the heap used by previous log
+        LogPtr = 0;
+    }
+    LogHistory[LogPtr++] = String(buf);
+    if (TFTTaskHandle) xTaskNotify(TFTTaskHandle, 1, eSetValueWithOverwrite); // xTaskNotifyGive(TFTTaskHandle);
+    va_end(vargs);
 }
