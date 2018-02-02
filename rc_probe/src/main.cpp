@@ -13,9 +13,11 @@
                         ===== UESTC Robot Probe For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/01/31
+                                        VERSION 2018/02/02
 
 */
+
+// Use esptool.py --port /dev/ttyUSB0 erase_flash to clear SPIFFS
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -32,13 +34,17 @@
 #include <ArduinoOTA.h>
 #include <RemoteDebug.h>
 #include <BY8X01-16P.h>
+#include <TimeLib.h>
+#include <NtpClientLib.h>
+// TODO: Add DS3231 RTC module
+#include <ESP8266FtpServer.h>
 #include "bitmap.h"
 
 #define HW_NAME "AutoRobot"
-#define SW_NAME "20180131"
+#define SW_NAME "20180202"
 
 #define ENABLE_TOUCH_CALIBRATE 0
-#define NOTIFY_DEVICE_NUM 3
+#define NOTIFY_DEVICE_NUM 5
 
 const char* AP_SSID      = "AR_Probe";
 const char* AP_PASSWORD  = "duoguanriben8";
@@ -50,6 +56,7 @@ struct ProbeConfig
 {
     uint8_t volume = 5;
     boolean hideSSID = false;
+    boolean rawUART = false;
 } config;
 
 #define CAN_TX_PIN GPIO_NUM_5
@@ -80,6 +87,8 @@ P.S. Check them in lib/TFT_eSPI/User_Setup.h
 P.P.S. TFT and Touchscreen are using VSPI, transactions (To work with other devices on the bus) are automatically enabled by TFT_eSPI for an ESP32 (to use HAL mutex)
 */
 
+#define Gyroscope_ID 0x11
+#define Encoder_ID 0x12
 #define DT35_H_ID 0x50
 #define DT35_F_ID 0x51
 #define DT35_R_ID 0x52
@@ -113,6 +122,7 @@ HardwareSerial Serial2(2);  // UART2/Serial2 pins 16, 17
 BY8X0116P audioController(Serial2, AUDIO_BUSY_PIN);
 TFT_eSPI tft = TFT_eSPI();
 RemoteDebug Debug;
+FtpServer ftpSrv;
 
 TaskHandle_t WiFiStationTaskHandle;
 TaskHandle_t AudioTaskHandle;
@@ -128,11 +138,16 @@ xQueueHandle SerialFIFO;
 //To learn more about Arduino String Class, see also https://hackingmajenkoblog.wordpress.com/2016/02/04/the-evils-of-arduino-strings/
 String LogHistory[13 * 20]; // Record for 20 pages at most
 uint16_t LogPtr = 0;
+
 uint32_t DeviceNotify[NOTIFY_DEVICE_NUM];
-uint32_t DT35[3]; // Array to save the data of DT35s
+float Gyroscope;
+int32_t Encoder[2]; // X-Y coordinate
+int32_t DT35[3]; // Array to save the data of DT35s
+
 boolean isWiFiConnected = false;
 boolean isUpdating = false;
 boolean isSDCardInserted = false;
+boolean isRecording = false;
 
 // NOTE: If we create a 16-bit Sprite, 320 x 240 x 2 bytes RAM is occupied, not a good choice
 
@@ -192,7 +207,7 @@ void setup() {
     Log(" - SSID: %s", AP_SSID);
     Log(" - Password: %s", AP_PASSWORD);
     Log(" - IP: %u.%u.%u.%u", APIP[0], APIP[1], APIP[2], APIP[3]);
-    
+
     if (SD.begin(SD_CARD_CS_PIN, SPI2)) // Detect SD Card
     {
         uint8_t cardType = SD.cardType();
@@ -208,6 +223,10 @@ void setup() {
             Log(" - Size: %llu MB", cardSize);
             Log(" - Total: %llu MB", SD.totalBytes() / (1024 * 1024));
             Log(" - Used: %llu MB", SD.usedBytes() / (1024 * 1024));
+            ftpSrv.begin("uestc", "robocon"); // Enable a simple file-only FTP server if SD Card was inserted
+            Log("FTP server started");
+            Log(" - Username: uestc");
+            Log(" - Password: robocon");
         }
     }
     // NOTE: ESP32 has MMC Controller, not using here mainly because it needs more pins and the pins cannot be remapped
@@ -244,6 +263,13 @@ void setup() {
     ArduinoOTA.setMdnsEnabled(false); // If WiFi is not in STA connected status, mDNS fails to start, so disable here
     ArduinoOTA.begin(); // Allow OTA process in AP Mode, default port is 3232
 
+    NTP.onNTPSyncEvent ([](NTPSyncEvent_t event)
+    {
+        if (event == timeSyncd) Log("Got NTP time: %s", NTP.getTimeDateString(NTP.getLastNTPSync()).c_str());
+        else if (event == noResponse) Log("Time sync error: NTP server not reachable");
+        else if (event == invalidAddress) Log("Time sync error: Invalid NTP server address");
+    });
+
     Debug.begin(HW_NAME); // Initiaze the telnet server
     Debug.setResetCmdEnabled(true); // Enable the reset command
     String helpCmd = "play - Drive the speaker\n";
@@ -255,12 +281,12 @@ void setup() {
     SerialFIFO = xQueueCreate(2048, sizeof(char)); // Create a FIFO to buffer Serial data
 
     // NOTE: My principle to arrange the priority of tasks is up to the delay in the task, the longer delay, the first you go
-    xTaskCreate(WiFiStationTask, "WiFi Station Config", 2048, NULL, 4, &WiFiStationTaskHandle);
-    xTaskCreate(AudioTask, "Audio Control", 2048, NULL, 3, &AudioTaskHandle);
+    xTaskCreate(WiFiStationTask, "WiFi Station Config", 4096, NULL, 4, &WiFiStationTaskHandle);
+    xTaskCreate(AudioTask, "Audio Control", 4096, NULL, 3, &AudioTaskHandle);
     xTaskCreate(TFTTask, "TFT Update", 4096, NULL, 2, &TFTTaskHandle);
-    xTaskCreate(CANRecvTask, "CAN Bus Receive", 2048, NULL, 1, &CANRecvTaskHandle);
-    xTaskCreate(UARTRecvTask, "UART Receive", 2048, NULL, 1, &UARTRecvTaskHandle);
-    xTaskCreate(TestTask, "Priority Test", 2048, NULL, 1, &TestTaskHandle);
+    xTaskCreate(CANRecvTask, "CAN Bus Receive", 4096, NULL, 1, &CANRecvTaskHandle);
+    xTaskCreate(UARTRecvTask, "UART Receive", 4096, NULL, 1, &UARTRecvTaskHandle);
+    xTaskCreate(TestTask, "Priority Test", 4096, NULL, 1, &TestTaskHandle);
 
     AddToPlaylist(1); // Play OS started tone
 }
@@ -268,6 +294,7 @@ void setup() {
 void loop() {
     ArduinoOTA.handle();
     Debug.handle();
+    ftpSrv.handleFTP();
     delay(50); // Maybe we can use yield() to take place of it
 }
 
@@ -292,6 +319,9 @@ void WiFiStationTask(void * pvParameters)
         ArduinoOTA.setMdnsEnabled(true); // Now STA connected, restart OTA here to enable mDNS
         ArduinoOTA.begin();
         MDNS.addService("telnet", "tcp", 23); // Telnet service (RemoteDebug)
+        NTP.begin("time1.aliyun.com", 8);
+        NTP.setInterval(10, 60);
+        Log("NTP service started");
         AddToPlaylist(2); // Play prefix tone
         AddToPlaylist(3); // Play WiFi Station connected tone
     }
@@ -321,6 +351,9 @@ void WiFiStationTask(void * pvParameters)
             ArduinoOTA.setMdnsEnabled(true); // Now STA connected, restart OTA here to enable mDNS
             ArduinoOTA.begin();
             MDNS.addService("telnet", "tcp", 23); // Telnet service (RemoteDebug)
+            NTP.begin("time1.aliyun.com", 8);
+            NTP.setInterval(10, 60);
+            Log("NTP service started");
             AddToPlaylist(2); // Play prefix tone
             AddToPlaylist(3); // Play WiFi Station connected tone
         }
@@ -426,19 +459,18 @@ void TFTTask(void * pvParameters)
             break;
 
             case 3: // @Variable
-            /*
-            tft.setCursor(100, 32);
-            tft.print("Variable Page");
-            tft.setCursor(0, 64);
-            tft.println("DT35 Debug Tool");
-            tft.setCursor(0, 100);
-            tft.fillRect(0, 100, 200, 48, TFT_BLACK);
-            tft.printf("Head: %u\r\n", DT35[0]);
-            tft.printf("Front: %u\r\n", DT35[1]);
-            tft.printf("Rear: %u\r\n", DT35[2]);
-            tft.pushImage(200, 120, 32, 32, bitmap_prev, TFT_BLACK);
-            tft.pushImage(260, 120, 32, 32, bitmap_next, TFT_BLACK);
-            */
+            tft.setFreeFont(&FreeSans9pt7b);
+            tft.setTextDatum(L_BASELINE);
+            tft.setTextPadding(160);
+            tft.drawString(String(Gyroscope, 6), 160, 64);
+            tft.drawString(String(Encoder[0]), 160, 88);
+            tft.drawString(String(Encoder[1]), 160, 112);
+            tft.drawString(String(DT35[0]), 160, 136);
+            tft.drawString(String(DT35[1]), 160, 160);
+            tft.drawString(String(DT35[2]), 160, 184);
+            tft.setTextFont(2);
+            tft.setTextDatum(TL_DATUM);
+            tft.setTextPadding(0);
             break;
 
             case 4: // @Settings
@@ -447,6 +479,7 @@ void TFTTask(void * pvParameters)
             case 5: // @Log
             if (ulTaskNotifyTake(pdTRUE, 0) == 1)
             {
+                RefreshLog: // Force refresh log label
                 if (LogFollow) LogPage = (LogPtr - 1) / 13 + 1; // [0, 13] => 1; [14, 26] => 2
                 tft.setTextDatum(CC_DATUM);
                 tft.fillRect(64, 0, 192, 32, TFT_BLACK);
@@ -479,17 +512,33 @@ void TFTTask(void * pvParameters)
             case 7: // @UART Monitor interface
             while (!pause && xQueueReceive(SerialFIFO, &tmp, 0) == pdTRUE)
             {
-                if (tmp > 31 && tmp < 128) xPos += tft.drawChar(tmp, xPos, yPos); // Char which can be displayed
-                if (tmp == '\r') xPos = 0; // Home
-                if (tmp == '\n') // New Line
+                if (!config.rawUART)
                 {
-                    yPos += 16;
-                    if (yPos >= 240)
+                    if (tmp > 31 && tmp < 128) xPos += tft.drawChar(tmp, xPos, yPos); // Char which can be displayed
+                    if (tmp == '\r') xPos = 0; // Home
+                    if (tmp == '\n') // New Line
+                    {
+                        yPos += 16;
+                        if (yPos >= 240)
+                        {
+                            xPos = 0;
+                            yPos = 16;
+                        }
+                        tft.fillRect(0, yPos, 320, 16, TFT_BLACK);
+                    }
+                }
+                else
+                {
+                    tft.setCursor(xPos, yPos);
+                    tft.printf("%02x", tmp);
+                    xPos += 20;
+                    if (xPos >= 320)
                     {
                         xPos = 0;
-                        yPos = 16;
+                        yPos += 16;
+                        if (yPos >= 240) yPos = 16;
+                        tft.fillRect(0, yPos, 320, 16, TFT_BLACK);
                     }
-                    tft.fillRect(0, yPos, 320, 16, TFT_BLACK);
                 }
             }
             break;
@@ -499,7 +548,7 @@ void TFTTask(void * pvParameters)
         if (pressed)
         {
             //Log("Touch, x=%u, y=%u", xTouch, yTouch);
-            //tft.fillCircle(x, y, 2, TFT_WHITE);
+            //tft.fillCircle(xTouch, yTouch, 2, TFT_WHITE);
             switch (scene)
             {
                 case 1: // @Main
@@ -508,7 +557,7 @@ void TFTTask(void * pvParameters)
                     if (RobotSelftestTaskHandle == NULL)
                     {
                         Log("Robot Selftest task began");
-                        xTaskCreate(RobotSelftestTask, "Robot Selftest Control", 2048, NULL, 5, &RobotSelftestTaskHandle);
+                        xTaskCreate(RobotSelftestTask, "Robot Selftest Control", 4096, NULL, 5, &RobotSelftestTaskHandle);
                     }
                     tft.fillScreen(TFT_BLACK);
                     tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
@@ -519,7 +568,24 @@ void TFTTask(void * pvParameters)
                 {
                     tft.fillScreen(TFT_BLACK);
                     tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
-                    tft.pushImage(288, 0, 32, 32, bitmap_record_begin, TFT_BLACK);
+                    tft.pushImage(32, 0, 32, 32, bitmap_prev, TFT_BLACK);
+                    tft.setTextDatum(TC_DATUM);
+                    tft.drawString("FSM Code: 12", 160 , 0);
+                    tft.drawString("Waiting for launch command", 160 , 16);
+                    tft.setTextDatum(TL_DATUM);
+                    tft.pushImage(256, 0, 32, 32, bitmap_next, TFT_BLACK);
+                    if (isRecording) tft.pushImage(288, 0, 32, 32, bitmap_record_stop, TFT_BLACK);
+                    else tft.pushImage(288, 0, 32, 32, bitmap_record_begin, TFT_BLACK);
+                    tft.setFreeFont(&FreeSans9pt7b);
+                    tft.setTextDatum(R_BASELINE);
+                    tft.drawString("Gyro:", 144, 64);
+                    tft.drawString("Encoder[X]:", 144, 88);
+                    tft.drawString("Encoder[Y]:", 144, 112);
+                    tft.drawString("DT35[H]:", 144, 136);
+                    tft.drawString("DT35[F]:", 144, 160);
+                    tft.drawString("DT35[R]:", 144, 184);
+                    tft.setTextFont(2);
+                    tft.setTextDatum(TL_DATUM);
                     scene = 3;
                 }
                 else if (xTouch >= 13 && xTouch <= 152 && yTouch >= 117 && yTouch <= 166) // => Settings
@@ -541,6 +607,10 @@ void TFTTask(void * pvParameters)
                     if (config.hideSSID) tft.pushImage(160, 64, 54, 32, bitmap_switch_on, TFT_BLACK);
                     else tft.pushImage(160, 64, 54, 32, bitmap_switch_off, TFT_BLACK);
 
+                    tft.drawString("Raw UART:", 144 , 120);
+                    if (config.rawUART) tft.pushImage(160, 100, 54, 32, bitmap_switch_on, TFT_BLACK);
+                    else tft.pushImage(160, 100, 54, 32, bitmap_switch_off, TFT_BLACK);
+
                     tft.setTextFont(2);
                     tft.setTextDatum(TL_DATUM);
                     scene = 4;
@@ -551,13 +621,14 @@ void TFTTask(void * pvParameters)
                     tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
                     tft.pushImage(32, 0, 32, 32, bitmap_prev, TFT_BLACK);
                     tft.setTextDatum(CC_DATUM);
+                    LogPage = (LogPtr - 1) / 13 + 1;
                     tft.drawString("Page " + String(LogPage) + "/" + String((LogPtr - 1) / 13 + 1) + ", " + String(LogPtr) + " records", 160 , 16);
                     tft.setTextDatum(TL_DATUM);
                     tft.pushImage(256, 0, 32, 32, bitmap_next, TFT_BLACK);
                     tft.pushImage(288, 0, 32, 32, bitmap_clear, TFT_BLACK);
-                    LogPage = (LogPtr - 1) / 13 + 1;
                     LogFollow = true;
                     scene = 5;
+                    goto RefreshLog;
                 }
                 else if (xTouch >= 13 && xTouch <= 152 && yTouch >= 177 && yTouch <= 226) // => CAN
                 {
@@ -586,6 +657,18 @@ void TFTTask(void * pvParameters)
                     yPos = 16;
                     pause = false;
                     scene = 7;
+                }
+                break;
+
+                case 3: // @Variable
+                if (xTouch >= 0 && xTouch <= 32 && yTouch >= 0 && yTouch <= 32) goto Home; // Home
+                else if (xTouch >= 32 && xTouch <= 64 && yTouch >= 0 && yTouch <= 32); // Previous page
+                else if (xTouch >= 256 && xTouch <= 288 && yTouch >= 0 && yTouch <= 32); // Next page
+                else if (xTouch >= 288 && xTouch <= 320 && yTouch >= 0 && yTouch <= 32) // Switch whether to record
+                {
+                    isRecording = !isRecording;
+                    if (isRecording) tft.pushImage(288, 0, 32, 32, bitmap_record_stop, TFT_BLACK);
+                    else tft.pushImage(288, 0, 32, 32, bitmap_record_begin, TFT_BLACK);
                 }
                 break;
 
@@ -623,6 +706,13 @@ void TFTTask(void * pvParameters)
                     else tft.pushImage(160, 64, 54, 32, bitmap_switch_off, TFT_BLACK);
                     writeConfig();
                 }
+                else if (xTouch >= 160 && xTouch <= 214 && yTouch >= 100 && yTouch <= 132) // Switch whether to print raw UART data
+                {
+                    config.rawUART = !config.rawUART;
+                    if (config.rawUART) tft.pushImage(160, 100, 54, 32, bitmap_switch_on, TFT_BLACK);
+                    else tft.pushImage(160, 100, 54, 32, bitmap_switch_off, TFT_BLACK);
+                    writeConfig();
+                }
                 break; // Do not response to blank zone
 
                 case 5: // @Log
@@ -649,7 +739,7 @@ void TFTTask(void * pvParameters)
                     for (uint16_t i = 0; i < 260; i++) LogHistory[i] = "";
                     LogPtr = 0;
                 }
-                xTaskNotify(TFTTaskHandle, 1, eSetValueWithOverwrite);
+                goto RefreshLog;
                 break;
 
                 case 6: // @CAN
@@ -706,26 +796,46 @@ void CANRecvTask(void * pvParameters)
             {
                 switch (rx_frame.MsgID)
                 {
-                    case DT35_H_ID:
+                    case Gyroscope_ID:
                     DeviceNotify[0] = millis();
+                    memcpy(&Gyroscope, &rx_frame.data.u8[0], 4);
+                    break;
+
+                    case Encoder_ID:
+                    DeviceNotify[1] = millis();
+                    memcpy(&Encoder[0], &rx_frame.data.u8[0], 4);
+                    memcpy(&Encoder[1], &rx_frame.data.u8[4], 4);
+                    break;
+
+                    case DT35_H_ID:
+                    DeviceNotify[2] = millis();
                     memcpy(&DT35[0], &rx_frame.data.u8[0], 4);
-                    Debug.printf("DT35_H: %u\r\n", DT35[0]);
                     break;
 
                     case DT35_F_ID:
-                    DeviceNotify[1] = millis();
+                    DeviceNotify[3] = millis();
                     memcpy(&DT35[1], &rx_frame.data.u8[0], 4);
-                    Debug.printf("DT35_F: %u\r\n", DT35[1]);
                     break;
 
                     case DT35_R_ID:
-                    DeviceNotify[2] = millis();
+                    DeviceNotify[4] = millis();
                     memcpy(&DT35[2], &rx_frame.data.u8[0], 4);
-                    Debug.printf("DT35_R: %u\r\n", DT35[2]);
                     break;
                 }
             }
             if (TFTTaskHandle) xTaskNotify(TFTTaskHandle, 2, eSetValueWithOverwrite); //xTaskNotifyGive(TFTTaskHandle);
+            if (isSDCardInserted) // Save log file to SD Card
+            {
+                File CANLogFile = SD.open("/CAN.csv", FILE_APPEND);
+                if (CANLogFile)
+                {
+                    CANLogFile.printf("%s,%u,", NTP.getTimeDateString().c_str(), rx_frame.FIR.B.DLC);
+                    for (uint8_t i = 0; i < rx_frame.FIR.B.DLC; i++) CANLogFile.printf("0x%02x,", rx_frame.data.u8[i]);
+                    for (uint8_t i = 0; i < 8 - rx_frame.FIR.B.DLC; i++) CANLogFile.printf(",");
+                    CANLogFile.printf("\r\n");
+                }
+                CANLogFile.close();
+            }
             Serial.println("-------------------------");
             Serial.printf("Pack Number: %u\r\n", packNum);
             Serial.print("Type: ");
@@ -757,6 +867,15 @@ void UARTRecvTask(void * pvParameters)
         {
             tmp = Serial.read();
             xQueueSend(SerialFIFO, &tmp, 0); // Insert item into the queue
+            if (isSDCardInserted) // Save log file to SD Card
+            {
+                File UARTLogFile = SD.open("/UART.csv", FILE_APPEND);
+                if (UARTLogFile)
+                {
+                    UARTLogFile.printf("%s,0x%02x,%c,\r\n", NTP.getTimeDateString().c_str(), tmp, tmp);
+                }
+                UARTLogFile.close();
+            }
         }
     }
     vTaskDelete(NULL);
@@ -766,8 +885,9 @@ void TestTask(void * pvParameters)
 {
     while (1)
     {
-        Log("Time: %u", millis());
-        delay(1000);
+        Log("[%u] System is running", millis());
+        //Log(NTP.getTimeDateString().c_str());
+        delay(5000);
     }
     vTaskDelete(NULL);
 }
@@ -861,6 +981,7 @@ void readConfig()
         else Log("Config cannot be loaded from SPIFFS");
         config.volume = root["volume"] | 5; // An interesting approach to load default value while JSON parse error
         config.hideSSID = root["hideSSID"] | false;
+        config.rawUART = root["rawUART"] | false;
         internalConfigFile.close(); // Close the file (File's destructor doesn't close the file)
     }
     else // Config file not found
@@ -878,6 +999,7 @@ void writeConfig()
     JsonObject &root = jsonBuffer.createObject();
     root["volume"] = config.volume;
     root["hideSSID"] = config.hideSSID;
+    root["rawUART"] = config.rawUART;
     if (root.printTo(internalConfigFile)) Log("Config saved to SPIFFS");
     else Log("Config cannot be saved to SPIFFS");
     internalConfigFile.close();
@@ -904,5 +1026,17 @@ void Log(const char * format, ...) // Customized printf based logging function
     }
     LogHistory[LogPtr++] = String(buf);
     if (TFTTaskHandle) xTaskNotify(TFTTaskHandle, 1, eSetValueWithOverwrite); // xTaskNotifyGive(TFTTaskHandle);
+    if (isSDCardInserted) // Save log file to SD Card
+    {
+        File externalLogFile = SD.open("/Syslog.csv", FILE_APPEND);
+        if (externalLogFile)
+        {
+            externalLogFile.printf(NTP.getTimeDateString().c_str());
+            externalLogFile.printf(",");
+            externalLogFile.printf(buf);
+            externalLogFile.printf(",\r\n");
+        }
+        externalLogFile.close();
+    }
     va_end(vargs);
 }
