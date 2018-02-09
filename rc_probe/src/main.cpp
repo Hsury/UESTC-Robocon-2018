@@ -464,9 +464,9 @@ void TFTTask(void * pvParameters)
         {
             case 0: // @Booting
             tft.pushImage((320 - 281) / 2, (240 - 64) / 2, 281, 64, bitmap_uestc); // Display UESTC LOGO
-            delay(500);
+            delay(1000);
             tft.pushImage((320 - 300) / 2, (240 - 116) / 2, 300, 116, bitmap_robocon); // Display Robocon 2018 LOGO
-            delay(500);
+            delay(1000);
             tft.pushImage(0, 0, 320, 240, bitmap_main);
             tft.setCursor(0, 0);
             tft.printf("HW: %s\r\nSW: %s", HW_NAME, SW_NAME);
@@ -1051,10 +1051,7 @@ void TouchscreenCalibrate()
 void readConfig()
 {
     StaticJsonBuffer<512> jsonBuffer; // Allocate the memory pool on the stack, see also https://arduinojson.org/assistant to compute the capacity
-    if (SPIFFS.exists("/config.json")2018_02_09_22_52_46_ܟ�?\��?���?Syslog.csv) failed
-Write
-[30869] System is running
-[E][vfs_api.cpp:265] VFSFileImpl(): fopen(/sd/2018_02_0)
+    if (SPIFFS.exists("/config.json"))
     {
         File internalConfigFile = SPIFFS.open("/config.json");
         JsonObject &root = jsonBuffer.parseObject(internalConfigFile); // Parse internal JSON config file
@@ -1062,10 +1059,7 @@ Write
         else Log("Config cannot be loaded from SPIFFS");
         config.volume = root["volume"] | 5; // An interesting approach to load default value while JSON parse error
         config.hideSSID = root["hideSSID"] | false;
-        config.rawUART = root["rawUAR2018_02_09_22_52_46_ܟ�?\��?���?Syslog.csv) failed
-Write
-[30869] System is running
-[E][vfs_api.cpp:265] VFSFileImpl(): fopen(/sd/2018_02_0T"] | false;
+        config.rawUART = root["rawUART"] | false;
         internalConfigFile.close(); // Close the file (File's destructor doesn't close the file)
     }
     else // Config file not found
