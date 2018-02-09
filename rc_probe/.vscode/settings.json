@@ -9,6 +9,8 @@
         "type_traits": "cpp",
         "memory": "cpp",
         "typeinfo": "cpp",
-        "utility": "cpp"
+        "utility": "cpp",
+        "functional": "cpp",
+        "istream": "cpp"
     }
 }

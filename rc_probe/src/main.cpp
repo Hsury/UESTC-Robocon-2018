@@ -13,7 +13,7 @@
                         ===== UESTC Robot Probe For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/02/02
+                                        VERSION 2018/02/09
 
 */
 
@@ -34,16 +34,18 @@
 #include <ArduinoOTA.h>
 #include <RemoteDebug.h>
 #include <BY8X01-16P.h>
+#include <Wire.h>
+#include <DS3232RTC.h>
 #include <TimeLib.h>
 #include <NtpClientLib.h>
-// TODO: Add DS3231 RTC module
 #include <ESP8266FtpServer.h>
 #include "bitmap.h"
 
 #define HW_NAME "AutoRobot"
-#define SW_NAME "20180202"
+#define SW_NAME "20180209"
 
 #define ENABLE_TOUCH_CALIBRATE 0
+#define UPDATE_RTC_TIME 0
 #define NOTIFY_DEVICE_NUM 5
 
 const char* AP_SSID      = "AR_Probe";
@@ -68,9 +70,10 @@ struct ProbeConfig
 #define HSPI_SCLK_PIN GPIO_NUM_27
 #define HSPI_MISO_PIN GPIO_NUM_32
 #define HSPI_MOSI_PIN GPIO_NUM_33
-#define AUDIO_BUSY_PIN GPIO_NUM_22
-#define TFT_PEN_PIN GPIO_NUM_25 // Seems useless, just leave it alone as a mark
+#define I2C_SDA_PIN GPIO_NUM_22
+#define I2C_SCL_PIN GPIO_NUM_25
 #define SD_CARD_CS_PIN GPIO_NUM_26
+#define AUDIO_BUSY_PIN GPIO_NUM_34
 
 /*
 TFT Relevant Pin List
@@ -112,13 +115,15 @@ Index     ID        Device       Variable       Description
 */
 
 CAN_device_t CAN_cfg;
-CAN_frame_t rx_frame;
+CAN_frame_t CAN_rx_frame;
+CAN_frame_t CAN_tx_frame;
 uint32_t packNum;
 
 SPIClass SPI2(HSPI); // In order to make full use of the chip and not to meet FreeRTOS task conflict with TFT, enable HSPI (HSPI = SPI2; VSPI = SPI3, Default)
 HardwareSerial Serial1(1);  // UART1/Serial1 pins 9, 10
 HardwareSerial Serial2(2);  // UART2/Serial2 pins 16, 17
 
+DS3232RTC RTC; // Need to be instanced manually
 BY8X0116P audioController(Serial2, AUDIO_BUSY_PIN);
 TFT_eSPI tft = TFT_eSPI();
 RemoteDebug Debug;
@@ -132,8 +137,12 @@ TaskHandle_t UARTRecvTaskHandle;
 TaskHandle_t TestTaskHandle;
 TaskHandle_t RobotSelftestTaskHandle;
 
+SemaphoreHandle_t RTCUpdateSemaphoreHandle;
+
 xQueueHandle AudioFIFO;
 xQueueHandle SerialFIFO;
+
+char BootTimePrefix[21]; // xxxx_xx_xx_xx_xx_xx_\0
 
 //To learn more about Arduino String Class, see also https://hackingmajenkoblog.wordpress.com/2016/02/04/the-evils-of-arduino-strings/
 String LogHistory[13 * 20]; // Record for 20 pages at most
@@ -144,6 +153,7 @@ float Gyroscope;
 int32_t Encoder[2]; // X-Y coordinate
 int32_t DT35[3]; // Array to save the data of DT35s
 
+boolean isRTC = false;
 boolean isWiFiConnected = false;
 boolean isUpdating = false;
 boolean isSDCardInserted = false;
@@ -174,6 +184,7 @@ void setup() {
     Serial2.begin(9600, SERIAL_8N1, UART2_RX_PIN, UART2_TX_PIN);
 
     SPI2.begin(HSPI_SCLK_PIN, HSPI_MISO_PIN, HSPI_MOSI_PIN);
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN); // Specify I2C Pins here instead of in RTC library
 
     CAN_cfg.speed = CAN_SPEED_1000KBPS; // Set CAN Bus speed to 1Mbps
     CAN_cfg.tx_pin_id = CAN_TX_PIN; // Set CAN TX Pin
@@ -181,32 +192,8 @@ void setup() {
     CAN_cfg.rx_queue = xQueueCreate(10, sizeof(CAN_frame_t)); // Create CAN RX Queue
     ESP32Can.CANInit(); // Start CAN module
 
-    if (SPIFFS.begin(true)) Log("SPIFFS mounted"); // Format SPIFFS on fail is enabled
-    readConfig(); // Load config
-
-    /*
-    pinMode(TFT_PEN_PIN, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(TFT_PEN_PIN), TouchISR, FALLING);
-    */
-
-    tft.init();
-    tft.setRotation(3);
-    #if ENABLE_TOUCH_CALIBRATE
-    TouchscreenCalibrate();
-    #endif
-    uint16_t calData[5] = {231, 3590, 156, 3560, 3};
-    tft.setTouch(calData);
-    tft.fillScreen(TFT_WHITE);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.setTextFont(2);
-
-    WiFi.softAP(AP_SSID, AP_PASSWORD, 1, config.hideSSID); // Begin AP mode
-    WiFi.softAPsetHostname(HW_NAME);
-    IPAddress APIP = WiFi.softAPIP();
-    Log("AP started");
-    Log(" - SSID: %s", AP_SSID);
-    Log(" - Password: %s", AP_PASSWORD);
-    Log(" - IP: %u.%u.%u.%u", APIP[0], APIP[1], APIP[2], APIP[3]);
+    setSyncProvider(RTC.get); // Try to sync with RTC
+    sprintf(BootTimePrefix, "%4d_%02d_%02d_%02d_%02d_%02d_", year(), month(), day(), hour(), minute(), second());
 
     if (SD.begin(SD_CARD_CS_PIN, SPI2)) // Detect SD Card
     {
@@ -223,18 +210,27 @@ void setup() {
             Log(" - Size: %llu MB", cardSize);
             Log(" - Total: %llu MB", SD.totalBytes() / (1024 * 1024));
             Log(" - Used: %llu MB", SD.usedBytes() / (1024 * 1024));
-            ftpSrv.begin("uestc", "robocon"); // Enable a simple file-only FTP server if SD Card was inserted
-            Log("FTP server started");
-            Log(" - Username: uestc");
-            Log(" - Password: robocon");
         }
     }
     // NOTE: ESP32 has MMC Controller, not using here mainly because it needs more pins and the pins cannot be remapped
-    
-    audioController.init(); // Initialize BY8301-16P module
-    audioController.setVolume(config.volume);
-    audioController.stop();
-    //audioController.printModuleInfo();
+
+    if (SPIFFS.begin(true)) Log("SPIFFS mounted"); // Format SPIFFS on fail is enabled
+    readConfig(); // Load config
+
+    if (timeStatus() == timeSet) // Check RTC sync status
+    {
+        isRTC = true;
+        Log("RTC module started");
+    }
+    else Log("RTC module not started");
+
+    WiFi.softAP(AP_SSID, AP_PASSWORD, 1, config.hideSSID); // Begin AP mode
+    WiFi.softAPsetHostname(HW_NAME);
+    IPAddress APIP = WiFi.softAPIP();
+    Log("AP started");
+    Log(" - SSID: %s", AP_SSID);
+    Log(" - Password: %s", AP_PASSWORD);
+    Log(" - IP: %u.%u.%u.%u", APIP[0], APIP[1], APIP[2], APIP[3]);
 
     ArduinoOTA
         .onStart([]() {
@@ -263,12 +259,29 @@ void setup() {
     ArduinoOTA.setMdnsEnabled(false); // If WiFi is not in STA connected status, mDNS fails to start, so disable here
     ArduinoOTA.begin(); // Allow OTA process in AP Mode, default port is 3232
 
-    NTP.onNTPSyncEvent ([](NTPSyncEvent_t event)
+    if (isSDCardInserted)
     {
-        if (event == timeSyncd) Log("Got NTP time: %s", NTP.getTimeDateString(NTP.getLastNTPSync()).c_str());
-        else if (event == noResponse) Log("Time sync error: NTP server not reachable");
-        else if (event == invalidAddress) Log("Time sync error: Invalid NTP server address");
-    });
+        ftpSrv.begin("uestc", "robocon"); // Enable a simple file-only FTP server if SD Card was inserted
+        Log("FTP server started");
+        Log(" - Username: uestc");
+        Log(" - Password: robocon");
+    }
+
+    tft.init();
+    tft.setRotation(3);
+    #if ENABLE_TOUCH_CALIBRATE
+    TouchscreenCalibrate();
+    #endif
+    uint16_t calData[5] = {231, 3590, 156, 3560, 3};
+    tft.setTouch(calData);
+    tft.fillScreen(TFT_WHITE);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextFont(2);
+
+    audioController.init(); // Initialize BY8301-16P module
+    audioController.setVolume(config.volume);
+    audioController.stop();
+    //audioController.printModuleInfo();
 
     Debug.begin(HW_NAME); // Initiaze the telnet server
     Debug.setResetCmdEnabled(true); // Enable the reset command
@@ -276,6 +289,26 @@ void setup() {
 	helpCmd.concat("uestc - emmmm");
 	Debug.setHelpProjectsCmds(helpCmd);
 	Debug.setCallBackProjectCmds(&processCmdRemoteDebug);
+
+    NTP.onNTPSyncEvent ([](NTPSyncEvent_t event)
+    {
+        if (event == timeSyncd)
+        {
+            Log("Got NTP time: %s", NTP.getTimeDateString(NTP.getLastNTPSync()).c_str());
+            #if UPDATE_RTC_TIME
+            if (isRTC) xSemaphoreGive(RTCUpdateSemaphoreHandle);
+            #endif
+        }
+        else if (event == noResponse) Log("Time sync error: NTP server not reachable");
+        else if (event == invalidAddress) Log("Time sync error: Invalid NTP server address");
+    });
+
+    /*
+    pinMode(TFT_PEN_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(TFT_PEN_PIN), TouchISR, FALLING);
+    */
+
+    RTCUpdateSemaphoreHandle = xSemaphoreCreateBinary();
 
     AudioFIFO = xQueueCreate(32, sizeof(uint8_t)); // Create a FIFO to buffer the playing request
     SerialFIFO = xQueueCreate(2048, sizeof(char)); // Create a FIFO to buffer Serial data
@@ -295,6 +328,13 @@ void loop() {
     ArduinoOTA.handle();
     Debug.handle();
     ftpSrv.handleFTP();
+    #if UPDATE_RTC_TIME
+    if (xSemaphoreTake(RTCUpdateSemaphoreHandle, 0) == pdTRUE)
+    {
+        RTC.set(now());
+        Log("RTC time updated");
+    }
+    #endif
     delay(50); // Maybe we can use yield() to take place of it
 }
 
@@ -319,9 +359,12 @@ void WiFiStationTask(void * pvParameters)
         ArduinoOTA.setMdnsEnabled(true); // Now STA connected, restart OTA here to enable mDNS
         ArduinoOTA.begin();
         MDNS.addService("telnet", "tcp", 23); // Telnet service (RemoteDebug)
-        NTP.begin("time1.aliyun.com", 8);
-        NTP.setInterval(10, 60);
-        Log("NTP service started");
+        if (!isRTC || UPDATE_RTC_TIME)
+        {
+            NTP.begin("time1.aliyun.com", 8);
+            NTP.setInterval(10, 60);
+            Log("NTP service started");
+        }
         AddToPlaylist(2); // Play prefix tone
         AddToPlaylist(3); // Play WiFi Station connected tone
     }
@@ -351,9 +394,12 @@ void WiFiStationTask(void * pvParameters)
             ArduinoOTA.setMdnsEnabled(true); // Now STA connected, restart OTA here to enable mDNS
             ArduinoOTA.begin();
             MDNS.addService("telnet", "tcp", 23); // Telnet service (RemoteDebug)
-            NTP.begin("time1.aliyun.com", 8);
-            NTP.setInterval(10, 60);
-            Log("NTP service started");
+            if (!isRTC || UPDATE_RTC_TIME)
+            {
+                NTP.begin("time1.aliyun.com", 8);
+                NTP.setInterval(10, 60);
+                Log("NTP service started");
+            }
             AddToPlaylist(2); // Play prefix tone
             AddToPlaylist(3); // Play WiFi Station connected tone
         }
@@ -418,9 +464,9 @@ void TFTTask(void * pvParameters)
         {
             case 0: // @Booting
             tft.pushImage((320 - 281) / 2, (240 - 64) / 2, 281, 64, bitmap_uestc); // Display UESTC LOGO
-            delay(2500);
+            delay(500);
             tft.pushImage((320 - 300) / 2, (240 - 116) / 2, 300, 116, bitmap_robocon); // Display Robocon 2018 LOGO
-            delay(2500);
+            delay(500);
             tft.pushImage(0, 0, 320, 240, bitmap_main);
             tft.setCursor(0, 0);
             tft.printf("HW: %s\r\nSW: %s", HW_NAME, SW_NAME);
@@ -452,10 +498,6 @@ void TFTTask(void * pvParameters)
             break;
 
             case 2: // @Selftest
-            tft.setCursor(100, 32);
-            tft.print("Selftest Page");
-            tft.pushImage(100, (240 - 32) / 2, 32, 32, bitmap_pass, TFT_BLACK); // Make black as transparent color
-            tft.pushImage(200, (240 - 32) / 2, 32, 32, bitmap_fail, TFT_BLACK); // Make black as transparent color
             break;
 
             case 3: // @Variable
@@ -498,10 +540,10 @@ void TFTTask(void * pvParameters)
             if (!pause && ulTaskNotifyTake(pdTRUE, 0) == 2) // If task is notified, which means that a new CAN frame has come, refresh the screen
             {
                 tft.setCursor(0, yPos);
-                tft.printf("%u, ID: %d, Data: ", packNum, rx_frame.MsgID);
-                for (uint8_t i = 0; i < rx_frame.FIR.B.DLC; i++)
+                tft.printf("%u, ID: %d, Data: ", packNum, CAN_rx_frame.MsgID);
+                for (uint8_t i = 0; i < CAN_rx_frame.FIR.B.DLC; i++)
                 {
-                    tft.printf("%02x ", rx_frame.data.u8[i]);
+                    tft.printf("%02x ", CAN_rx_frame.data.u8[i]);
                 }
                 yPos += 16;
                 if (yPos >= 240) yPos = 16;
@@ -554,14 +596,23 @@ void TFTTask(void * pvParameters)
                 case 1: // @Main
                 if (xTouch >= 13 && xTouch <= 152 && yTouch >= 57 && yTouch <= 106) // => Selftest
                 {
-                    if (RobotSelftestTaskHandle == NULL)
-                    {
-                        Log("Robot Selftest task began");
-                        xTaskCreate(RobotSelftestTask, "Robot Selftest Control", 4096, NULL, 5, &RobotSelftestTaskHandle);
-                    }
                     tft.fillScreen(TFT_BLACK);
                     tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
                     tft.pushImage(288, 0, 32, 32, bitmap_refresh, TFT_BLACK);
+
+                    tft.pushImage(128, 32, 32, 32, bitmap_pass, TFT_BLACK); // Make black as transparent color
+                    tft.pushImage(192, 32, 32, 32, bitmap_fail, TFT_BLACK); // Make black as transparent color
+
+                    tft.drawRect(32, 80, 80, 50, TFT_WHITE);
+                    tft.setTextDatum(CC_DATUM);
+                    tft.drawString("Skip ST", 72 , 105);
+                    tft.setTextDatum(TL_DATUM);
+
+                    tft.drawRect(32, 160, 80, 50, TFT_WHITE);
+                    tft.setTextDatum(CC_DATUM);
+                    tft.drawString("Launch", 72 , 185);
+                    tft.setTextDatum(TL_DATUM);
+
                     scene = 2;
                 }
                 else if (xTouch >= 167 && xTouch <= 306 && yTouch >= 57 && yTouch <= 106) // => Variable
@@ -657,6 +708,33 @@ void TFTTask(void * pvParameters)
                     yPos = 16;
                     pause = false;
                     scene = 7;
+                }
+                break;
+
+                case 2: // @Selftest
+                if (xTouch >= 0 && xTouch <= 32 && yTouch >= 0 && yTouch <= 32) goto Home; // Home
+                else if (xTouch >= 288 && xTouch <= 320 && yTouch >= 0 && yTouch <= 32) // REBOOT
+                {
+                    CAN_tx_frame.MsgID = 0xAA;
+                    CAN_tx_frame.FIR.B.DLC = 5;
+                    ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                    if (RobotSelftestTaskHandle == NULL)
+                    {
+                        Log("Robot Selftest task began");
+                        xTaskCreate(RobotSelftestTask, "Robot Selftest Control", 4096, NULL, 5, &RobotSelftestTaskHandle);
+                    }
+                }
+                else if (xTouch >= 32 && xTouch <= 112 && yTouch >= 80 && yTouch <= 130) // SKIP SELFTEST
+                {
+                    CAN_tx_frame.MsgID = 0xAB;
+                    CAN_tx_frame.FIR.B.DLC = 1;
+                    ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                }
+                else if (xTouch >= 32 && xTouch <= 112 && yTouch >= 140 && yTouch <= 190) // LAUNCH
+                {
+                    CAN_tx_frame.MsgID = 0xAC;
+                    CAN_tx_frame.FIR.B.DLC = 1;
+                    ESP32Can.CANWriteFrame(&CAN_tx_frame);
                 }
                 break;
 
@@ -789,49 +867,49 @@ void CANRecvTask(void * pvParameters)
 {
     while (1)
     {
-        if (xQueueReceive(CAN_cfg.rx_queue, &rx_frame, 3 * portTICK_PERIOD_MS) == pdTRUE)
+        if (xQueueReceive(CAN_cfg.rx_queue, &CAN_rx_frame, 3 * portTICK_PERIOD_MS) == pdTRUE)
         {
             packNum++;
-            if (rx_frame.FIR.B.FF == CAN_frame_std && rx_frame.FIR.B.RTR != CAN_RTR) // Software CAN filter
+            if (CAN_rx_frame.FIR.B.FF == CAN_frame_std && CAN_rx_frame.FIR.B.RTR != CAN_RTR) // Software CAN filter
             {
-                switch (rx_frame.MsgID)
+                switch (CAN_rx_frame.MsgID)
                 {
                     case Gyroscope_ID:
                     DeviceNotify[0] = millis();
-                    memcpy(&Gyroscope, &rx_frame.data.u8[0], 4);
+                    memcpy(&Gyroscope, &CAN_rx_frame.data.u8[0], 4);
                     break;
 
                     case Encoder_ID:
                     DeviceNotify[1] = millis();
-                    memcpy(&Encoder[0], &rx_frame.data.u8[0], 4);
-                    memcpy(&Encoder[1], &rx_frame.data.u8[4], 4);
+                    memcpy(&Encoder[0], &CAN_rx_frame.data.u8[0], 4);
+                    memcpy(&Encoder[1], &CAN_rx_frame.data.u8[4], 4);
                     break;
 
                     case DT35_H_ID:
                     DeviceNotify[2] = millis();
-                    memcpy(&DT35[0], &rx_frame.data.u8[0], 4);
+                    memcpy(&DT35[0], &CAN_rx_frame.data.u8[0], 4);
                     break;
 
                     case DT35_F_ID:
                     DeviceNotify[3] = millis();
-                    memcpy(&DT35[1], &rx_frame.data.u8[0], 4);
+                    memcpy(&DT35[1], &CAN_rx_frame.data.u8[0], 4);
                     break;
 
                     case DT35_R_ID:
                     DeviceNotify[4] = millis();
-                    memcpy(&DT35[2], &rx_frame.data.u8[0], 4);
+                    memcpy(&DT35[2], &CAN_rx_frame.data.u8[0], 4);
                     break;
                 }
             }
             if (TFTTaskHandle) xTaskNotify(TFTTaskHandle, 2, eSetValueWithOverwrite); //xTaskNotifyGive(TFTTaskHandle);
             if (isSDCardInserted) // Save log file to SD Card
             {
-                File CANLogFile = SD.open("/CAN.csv", FILE_APPEND);
+                File CANLogFile = SD.open("/" + String(BootTimePrefix) + "CAN.csv", FILE_APPEND);
                 if (CANLogFile)
                 {
-                    CANLogFile.printf("%s,%u,", NTP.getTimeDateString().c_str(), rx_frame.FIR.B.DLC);
-                    for (uint8_t i = 0; i < rx_frame.FIR.B.DLC; i++) CANLogFile.printf("0x%02x,", rx_frame.data.u8[i]);
-                    for (uint8_t i = 0; i < 8 - rx_frame.FIR.B.DLC; i++) CANLogFile.printf(",");
+                    CANLogFile.printf("%02u:%02u:%02u,%u,%u,%u,", hour(), minute(), second(), millis(), CAN_rx_frame.MsgID, CAN_rx_frame.FIR.B.DLC);
+                    for (uint8_t i = 0; i < CAN_rx_frame.FIR.B.DLC; i++) CANLogFile.printf("0x%02x,", CAN_rx_frame.data.u8[i]);
+                    for (uint8_t i = 0; i < 8 - CAN_rx_frame.FIR.B.DLC; i++) CANLogFile.printf(",");
                     CANLogFile.printf("\r\n");
                 }
                 CANLogFile.close();
@@ -839,17 +917,17 @@ void CANRecvTask(void * pvParameters)
             Serial.println("-------------------------");
             Serial.printf("Pack Number: %u\r\n", packNum);
             Serial.print("Type: ");
-            if (rx_frame.FIR.B.FF == CAN_frame_std) Serial.println("Standard");
+            if (CAN_rx_frame.FIR.B.FF == CAN_frame_std) Serial.println("Standard");
             else Serial.println("Extend");
             Serial.print("RTR: ");
-            if (rx_frame.FIR.B.RTR == CAN_RTR) Serial.println("True");
+            if (CAN_rx_frame.FIR.B.RTR == CAN_RTR) Serial.println("True");
             else Serial.println("False");
-            Serial.printf("Msg ID: 0x%08x\r\n", rx_frame.MsgID);
-            Serial.printf("DLC: %d\r\n", rx_frame.FIR.B.DLC);
+            Serial.printf("Msg ID: 0x%08x\r\n", CAN_rx_frame.MsgID);
+            Serial.printf("DLC: %d\r\n", CAN_rx_frame.FIR.B.DLC);
             Serial.print("Data: ");
-            for (uint8_t i = 0; i < rx_frame.FIR.B.DLC; i++)
+            for (uint8_t i = 0; i < CAN_rx_frame.FIR.B.DLC; i++)
             {
-                Serial.printf("%02x ", rx_frame.data.u8[i]);
+                Serial.printf("%02x ", CAN_rx_frame.data.u8[i]);
             }
             Serial.println();
             Serial.println("-------------------------");
@@ -869,10 +947,10 @@ void UARTRecvTask(void * pvParameters)
             xQueueSend(SerialFIFO, &tmp, 0); // Insert item into the queue
             if (isSDCardInserted) // Save log file to SD Card
             {
-                File UARTLogFile = SD.open("/UART.csv", FILE_APPEND);
+                File UARTLogFile = SD.open("/" + String(BootTimePrefix) + "UART.csv", FILE_APPEND);
                 if (UARTLogFile)
                 {
-                    UARTLogFile.printf("%s,0x%02x,%c,\r\n", NTP.getTimeDateString().c_str(), tmp, tmp);
+                    UARTLogFile.printf("%02u:%02u:%02u,%u,%s,0x%02x,%c,\r\n", hour(), minute(), second(), millis(), tmp, tmp);
                 }
                 UARTLogFile.close();
             }
@@ -973,7 +1051,10 @@ void TouchscreenCalibrate()
 void readConfig()
 {
     StaticJsonBuffer<512> jsonBuffer; // Allocate the memory pool on the stack, see also https://arduinojson.org/assistant to compute the capacity
-    if (SPIFFS.exists("/config.json"))
+    if (SPIFFS.exists("/config.json")2018_02_09_22_52_46_ܟ�?\��?���?Syslog.csv) failed
+Write
+[30869] System is running
+[E][vfs_api.cpp:265] VFSFileImpl(): fopen(/sd/2018_02_0)
     {
         File internalConfigFile = SPIFFS.open("/config.json");
         JsonObject &root = jsonBuffer.parseObject(internalConfigFile); // Parse internal JSON config file
@@ -981,7 +1062,10 @@ void readConfig()
         else Log("Config cannot be loaded from SPIFFS");
         config.volume = root["volume"] | 5; // An interesting approach to load default value while JSON parse error
         config.hideSSID = root["hideSSID"] | false;
-        config.rawUART = root["rawUART"] | false;
+        config.rawUART = root["rawUAR2018_02_09_22_52_46_ܟ�?\��?���?Syslog.csv) failed
+Write
+[30869] System is running
+[E][vfs_api.cpp:265] VFSFileImpl(): fopen(/sd/2018_02_0T"] | false;
         internalConfigFile.close(); // Close the file (File's destructor doesn't close the file)
     }
     else // Config file not found
@@ -1028,11 +1112,10 @@ void Log(const char * format, ...) // Customized printf based logging function
     if (TFTTaskHandle) xTaskNotify(TFTTaskHandle, 1, eSetValueWithOverwrite); // xTaskNotifyGive(TFTTaskHandle);
     if (isSDCardInserted) // Save log file to SD Card
     {
-        File externalLogFile = SD.open("/Syslog.csv", FILE_APPEND);
+        File externalLogFile = SD.open("/" + String(BootTimePrefix) + "Syslog.csv", FILE_APPEND);
         if (externalLogFile)
         {
-            externalLogFile.printf(NTP.getTimeDateString().c_str());
-            externalLogFile.printf(",");
+            externalLogFile.printf("%02u:%02u:%02u,%u,", hour(), minute(), second(), millis());
             externalLogFile.printf(buf);
             externalLogFile.printf(",\r\n");
         }
