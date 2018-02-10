@@ -540,8 +540,8 @@ void TFTTask(void * pvParameters)
                 {
                     tft.fillRect(20, 70, 280, 160, TFT_BLACK);
                     tft.drawRect(20, 70, 280, 160, TFT_WHITE);
-                    tft.drawCircle(20 + 0.5714 * TouchScreen[0], 70 + 0.5714 * TouchScreen[1], 20, TFT_WHITE);
-                    tft.fillCircle(20 + 0.5714 * TouchScreen[0], 70 + 0.5714 * TouchScreen[1], 2, TFT_WHITE);
+                    tft.drawCircle(20 + 0.8 * TouchScreen[0], 70 + 0.8 * TouchScreen[1], 20, TFT_WHITE);
+                    tft.fillCircle(20 + 0.8 * TouchScreen[0], 70 + 0.8 * TouchScreen[1], 2, TFT_WHITE);
                 }
                 break;
             }
