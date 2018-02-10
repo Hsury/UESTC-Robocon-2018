@@ -13,11 +13,20 @@
                         ===== UESTC Robot Probe For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/02/09
+                                        VERSION 2018/02/10
 
 */
 
 // Use esptool.py --port /dev/ttyUSB0 erase_flash to clear SPIFFS
+
+/*
+TODO List:
+1, Fix high-posibility speaker explosion when volume is set above 20
+2. Optimize Wi-Fi connection stability
+3. Complete variable logging system
+4. Complete selftest system
+5. Add Competition/Debug dual mode
+*/
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -42,7 +51,7 @@
 #include "bitmap.h"
 
 #define HW_NAME "AutoRobot"
-#define SW_NAME "20180209"
+#define SW_NAME "20180210"
 
 #define ENABLE_TOUCH_CALIBRATE 0
 #define UPDATE_RTC_TIME 0
@@ -95,6 +104,7 @@ P.P.S. TFT and Touchscreen are using VSPI, transactions (To work with other devi
 #define DT35_H_ID 0x50
 #define DT35_F_ID 0x51
 #define DT35_R_ID 0x52
+#define TouchScreen_ID 0x15
 
 /*
 CAN Device Table
@@ -152,6 +162,7 @@ uint32_t DeviceNotify[NOTIFY_DEVICE_NUM];
 float Gyroscope;
 int32_t Encoder[2]; // X-Y coordinate
 int32_t DT35[3]; // Array to save the data of DT35s
+uint16_t TouchScreen[2]; // X-Y coordinate
 
 boolean isRTC = false;
 boolean isWiFiConnected = false;
@@ -449,6 +460,7 @@ void AudioTask(void * pvParameters)
 void TFTTask(void * pvParameters)
 {
     uint8_t scene = 0;
+    uint8_t subScene = 0;
     uint16_t xPos = 0, yPos = 16; // To store command interface coordinates
     boolean pressed;
     uint16_t xTouch = 0, yTouch = 0; // To store the touch coordinates
@@ -501,18 +513,38 @@ void TFTTask(void * pvParameters)
             break;
 
             case 3: // @Variable
-            tft.setFreeFont(&FreeSans9pt7b);
-            tft.setTextDatum(L_BASELINE);
-            tft.setTextPadding(160);
-            tft.drawString(String(Gyroscope, 6), 160, 64);
-            tft.drawString(String(Encoder[0]), 160, 88);
-            tft.drawString(String(Encoder[1]), 160, 112);
-            tft.drawString(String(DT35[0]), 160, 136);
-            tft.drawString(String(DT35[1]), 160, 160);
-            tft.drawString(String(DT35[2]), 160, 184);
-            tft.setTextFont(2);
-            tft.setTextDatum(TL_DATUM);
-            tft.setTextPadding(0);
+            switch (subScene)
+            {
+                case 0:
+                tft.setFreeFont(&FreeSans9pt7b);
+                tft.setTextDatum(L_BASELINE);
+                tft.setTextPadding(160);
+                tft.drawString(String(Gyroscope, 6), 160, 64);
+                tft.drawString(String(Encoder[0]), 160, 88);
+                tft.drawString(String(Encoder[1]), 160, 112);
+                tft.drawString(String(DT35[0]), 160, 136);
+                tft.drawString(String(DT35[1]), 160, 160);
+                tft.drawString(String(DT35[2]), 160, 184);
+                tft.setTextFont(2);
+                tft.setTextDatum(TL_DATUM);
+                tft.setTextPadding(0);
+                break;
+
+                case 1:
+                tft.setTextDatum(CC_DATUM);
+                tft.setTextPadding(128);
+                tft.drawString(String(TouchScreen[0]) + ", " + String(TouchScreen[1]), 160, 60);
+                tft.setTextDatum(TL_DATUM);
+                tft.setTextPadding(0);
+                if (TouchScreen[0] && TouchScreen[1])
+                {
+                    tft.fillRect(20, 70, 280, 160, TFT_BLACK);
+                    tft.drawRect(20, 70, 280, 160, TFT_WHITE);
+                    tft.drawCircle(20 + 0.5714 * TouchScreen[0], 70 + 0.5714 * TouchScreen[1], 20, TFT_WHITE);
+                    tft.fillCircle(20 + 0.5714 * TouchScreen[0], 70 + 0.5714 * TouchScreen[1], 2, TFT_WHITE);
+                }
+                break;
+            }
             break;
 
             case 4: // @Settings
@@ -627,22 +659,37 @@ void TFTTask(void * pvParameters)
                     tft.pushImage(256, 0, 32, 32, bitmap_next, TFT_BLACK);
                     if (isRecording) tft.pushImage(288, 0, 32, 32, bitmap_record_stop, TFT_BLACK);
                     else tft.pushImage(288, 0, 32, 32, bitmap_record_begin, TFT_BLACK);
-                    tft.setFreeFont(&FreeSans9pt7b);
-                    tft.setTextDatum(R_BASELINE);
-                    tft.drawString("Gyro:", 144, 64);
-                    tft.drawString("Encoder[X]:", 144, 88);
-                    tft.drawString("Encoder[Y]:", 144, 112);
-                    tft.drawString("DT35[H]:", 144, 136);
-                    tft.drawString("DT35[F]:", 144, 160);
-                    tft.drawString("DT35[R]:", 144, 184);
-                    tft.setTextFont(2);
-                    tft.setTextDatum(TL_DATUM);
                     scene = 3;
+                    //subScene = 0; // Uncomment this line to forget footprint
+                    RefreshVariableFrame:
+                    switch (subScene)
+                    {
+                        case 0: // @Variable.Summary
+                        tft.setFreeFont(&FreeSans9pt7b);
+                        tft.setTextDatum(R_BASELINE);
+                        tft.drawString("Gyro:", 144, 64);
+                        tft.drawString("Encoder[X]:", 144, 88);
+                        tft.drawString("Encoder[Y]:", 144, 112);
+                        tft.drawString("DT35[H]:", 144, 136);
+                        tft.drawString("DT35[F]:", 144, 160);
+                        tft.drawString("DT35[R]:", 144, 184);
+                        tft.setTextFont(2);
+                        tft.setTextDatum(TL_DATUM);
+                        break;
+
+                        case 1: // @Variable.TouchScreen
+                        tft.setTextDatum(CC_DATUM);
+                        tft.drawString("TouchScreen", 160, 42);
+                        tft.setTextDatum(TL_DATUM);
+                        tft.drawRect(20, 70, 280, 160, TFT_WHITE);
+                        break;
+                    }
                 }
                 else if (xTouch >= 13 && xTouch <= 152 && yTouch >= 117 && yTouch <= 166) // => Settings
                 {
                     tft.fillScreen(TFT_BLACK);
                     tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
+                    if (isSDCardInserted) tft.pushImage(256, 0, 32, 32, bitmap_eject_sdcard, TFT_BLACK);
                     tft.pushImage(288, 0, 32, 32, bitmap_power, TFT_BLACK);
                     tft.setFreeFont(&FreeSans9pt7b);
 
@@ -740,8 +787,20 @@ void TFTTask(void * pvParameters)
 
                 case 3: // @Variable
                 if (xTouch >= 0 && xTouch <= 32 && yTouch >= 0 && yTouch <= 32) goto Home; // Home
-                else if (xTouch >= 32 && xTouch <= 64 && yTouch >= 0 && yTouch <= 32); // Previous page
-                else if (xTouch >= 256 && xTouch <= 288 && yTouch >= 0 && yTouch <= 32); // Next page
+                else if (xTouch >= 32 && xTouch <= 64 && yTouch >= 0 && yTouch <= 32) // Previous page
+                {
+                    if (subScene > 0) subScene--;
+                    else subScene = 1;
+                    tft.fillRect(0, 32, 320, 208, TFT_BLACK);
+                    goto RefreshVariableFrame;
+                }
+                else if (xTouch >= 256 && xTouch <= 288 && yTouch >= 0 && yTouch <= 32) // Next page
+                {
+                    if (subScene < 1) subScene++;
+                    else subScene = 0;
+                    tft.fillRect(0, 32, 320, 208, TFT_BLACK);
+                    goto RefreshVariableFrame;
+                }
                 else if (xTouch >= 288 && xTouch <= 320 && yTouch >= 0 && yTouch <= 32) // Switch whether to record
                 {
                     isRecording = !isRecording;
@@ -752,7 +811,22 @@ void TFTTask(void * pvParameters)
 
                 case 4: // @Settings
                 if (xTouch >= 0 && xTouch <= 32 && yTouch >= 0 && yTouch <= 32) goto Home; // Home
-                else if (xTouch >= 288 && xTouch <= 320 && yTouch >= 0 && yTouch <= 32) ESP.restart(); // Reboot
+                else if (xTouch >= 256 && xTouch <= 288 && yTouch >= 0 && yTouch <= 32) // Eject SD Card
+                {
+                    if (isSDCardInserted)
+                    {
+                        isSDCardInserted = false;
+                        tft.fillRect(256, 0, 32, 32, TFT_BLACK); // Remove SD Card Icon
+                        Log("SD Card unmounted");
+                        SD.end();
+                    }
+                }
+                else if (xTouch >= 288 && xTouch <= 320 && yTouch >= 0 && yTouch <= 32) // Reboot
+                {
+                    if (isSDCardInserted) SD.end();
+                    SPIFFS.end();
+                    ESP.restart();
+                }
                 else if (xTouch >= 160 && xTouch <= 192 && yTouch >= 28 && yTouch <= 60) // Volume down
                 {
                     if (config.volume > 0) config.volume--;
@@ -899,6 +973,11 @@ void CANRecvTask(void * pvParameters)
                     DeviceNotify[4] = millis();
                     memcpy(&DT35[2], &CAN_rx_frame.data.u8[0], 4);
                     break;
+
+                    case TouchScreen_ID:
+                    memcpy(&TouchScreen[0], &CAN_rx_frame.data.u8[0], 2);
+                    memcpy(&TouchScreen[1], &CAN_rx_frame.data.u8[2], 2);
+                    break;
                 }
             }
             if (TFTTaskHandle) xTaskNotify(TFTTaskHandle, 2, eSetValueWithOverwrite); //xTaskNotifyGive(TFTTaskHandle);
@@ -907,7 +986,7 @@ void CANRecvTask(void * pvParameters)
                 File CANLogFile = SD.open("/" + String(BootTimePrefix) + "CAN.csv", FILE_APPEND);
                 if (CANLogFile)
                 {
-                    CANLogFile.printf("%02u:%02u:%02u,%u,%u,%u,", hour(), minute(), second(), millis(), CAN_rx_frame.MsgID, CAN_rx_frame.FIR.B.DLC);
+                    CANLogFile.printf("%02u:%02u:%02u,%u,%u,%u,%u,", hour(), minute(), second(), millis(), packNum, CAN_rx_frame.MsgID, CAN_rx_frame.FIR.B.DLC);
                     for (uint8_t i = 0; i < CAN_rx_frame.FIR.B.DLC; i++) CANLogFile.printf("0x%02x,", CAN_rx_frame.data.u8[i]);
                     for (uint8_t i = 0; i < 8 - CAN_rx_frame.FIR.B.DLC; i++) CANLogFile.printf(",");
                     CANLogFile.printf("\r\n");
