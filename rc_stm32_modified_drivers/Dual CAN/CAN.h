@@ -10,6 +10,6 @@ void CAN_Init();
 u8 CAN1_Send();
 u8 CAN2_Send();
 void CAN1_RX0_IRQHandler();
-void CAN2_RX1_IRQHandler();
+void CAN2_RX0_IRQHandler();
 
 #endif

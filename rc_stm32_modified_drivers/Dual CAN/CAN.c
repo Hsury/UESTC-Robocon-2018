@@ -54,7 +54,7 @@ void CAN_Init()
     CAN_FilterInitStructure.CAN_FilterActivation     = ENABLE;                                     // 激活过滤器0
     CAN_FilterInit(&CAN_FilterInitStructure);                                                      // 滤波器初始化
     CAN_FilterInitStructure.CAN_FilterNumber         = 14;                                         // 过滤器14
-    CAN_FilterInitStructure.CAN_FilterFIFOAssignment = CAN_Filter_FIFO1;                           // 过滤器14关联到FIFO1
+    CAN_FilterInitStructure.CAN_FilterFIFOAssignment = CAN_Filter_FIFO0;                           // 过滤器14关联到FIFO0
     CAN_FilterInitStructure.CAN_FilterActivation     = ENABLE;                                     // 激活过滤器14
     CAN_FilterInit(&CAN_FilterInitStructure);                                                      // 滤波器初始化
     
@@ -64,11 +64,11 @@ void CAN_Init()
     NVIC_InitStructure.NVIC_IRQChannelCmd                = ENABLE;
     CAN_ITConfig(CAN1, CAN_IT_FMP0, ENABLE);                                                       // FIFO0消息挂号中断允许
     NVIC_Init(&NVIC_InitStructure);
-    NVIC_InitStructure.NVIC_IRQChannel                   = CAN2_RX1_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 10;                                     // 主优先级为1
+    NVIC_InitStructure.NVIC_IRQChannel                   = CAN2_RX0_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 10;                                     // 主优先级为10
     NVIC_InitStructure.NVIC_IRQChannelSubPriority        = 0;                                      // 次优先级为0
     NVIC_InitStructure.NVIC_IRQChannelCmd                = ENABLE;
-    CAN_ITConfig(CAN2, CAN_IT_FMP1, ENABLE);                                                       // FIFO1消息挂号中断允许
+    CAN_ITConfig(CAN2, CAN_IT_FMP0, ENABLE);                                                       // FIFO0消息挂号中断允许
     NVIC_Init(&NVIC_InitStructure);
 }
 
@@ -98,8 +98,8 @@ void CAN1_RX0_IRQHandler()
     // 在这里添加CAN1中断服务函数
 }
 
-void CAN2_RX1_IRQHandler()
+void CAN2_RX0_IRQHandler()
 {
-    CAN_Receive(CAN2, CAN_FIFO1, &CAN2RxMessage);
+    CAN_Receive(CAN2, CAN_FIFO0, &CAN2RxMessage);
     // 在这里添加CAN2中断服务函数
 }
