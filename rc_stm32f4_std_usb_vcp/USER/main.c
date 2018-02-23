@@ -58,7 +58,7 @@ int main(void)
     {
         LED2 = !LED2;
         VCP_DataTx("0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ 你好，世界！\r\n", 58);
-        //delay_ms(100);
+        delay_us(100);
     }
 } 
 

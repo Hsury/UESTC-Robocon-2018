@@ -119,7 +119,7 @@ uint16_t VCP_DataTx (uint8_t* Buf, uint32_t Len)
             if (VCP_Tx_Buffer_Usage <= VCP_TX_BUFFER_MAX_USAGE) break; //缓冲区到达警戒线
             else
             {
-                printf("VCP Tx Buffer Alert, Usage: %u\r\n", VCP_Tx_Buffer_Usage);
+                printf("> VCP Tx Buffer Alert, Usage: %u\r\n", VCP_Tx_Buffer_Usage);
                 while (1)
                 {
                     VCP_Tx_Buffer_Usage = (APP_Rx_ptr_out > APP_Rx_ptr_in) ?
