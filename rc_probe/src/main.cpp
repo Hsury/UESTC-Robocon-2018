@@ -13,7 +13,7 @@
                         ===== UESTC Robot Probe For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/02/10
+                                        VERSION 2018/02/24
 
 */
 
@@ -51,7 +51,7 @@ TODO List:
 #include "bitmap.h"
 
 #define HW_NAME "AutoRobot"
-#define SW_NAME "20180210"
+#define SW_NAME "20180224"
 
 #define ENABLE_TOUCH_CALIBRATE 0
 #define UPDATE_RTC_TIME 0
@@ -70,30 +70,30 @@ struct ProbeConfig
     boolean rawUART = false;
 } config;
 
-#define CAN_TX_PIN GPIO_NUM_5
 #define CAN_RX_PIN GPIO_NUM_4
-#define UART1_TX_PIN GPIO_NUM_12
-#define UART1_RX_PIN GPIO_NUM_14
+#define CAN_TX_PIN GPIO_NUM_5
+#define HSPI_SCLK_PIN GPIO_NUM_14
 #define UART2_TX_PIN GPIO_NUM_16
 #define UART2_RX_PIN GPIO_NUM_17
-#define HSPI_SCLK_PIN GPIO_NUM_27
-#define HSPI_MISO_PIN GPIO_NUM_32
-#define HSPI_MOSI_PIN GPIO_NUM_33
 #define I2C_SDA_PIN GPIO_NUM_22
-#define I2C_SCL_PIN GPIO_NUM_25
-#define SD_CARD_CS_PIN GPIO_NUM_26
+#define I2C_SCL_PIN GPIO_NUM_23
+#define SD_CARD_CS_PIN GPIO_NUM_25
+#define HSPI_MOSI_PIN GPIO_NUM_26
+#define HSPI_MISO_PIN GPIO_NUM_27
+#define UART1_RX_PIN GPIO_NUM_32
+#define UART1_TX_PIN GPIO_NUM_33
 #define AUDIO_BUSY_PIN GPIO_NUM_34
 
 /*
 TFT Relevant Pin List
 
-TFT_MISO  19
-TFT_MOSI  23
+TFT_MISO  21
+TFT_MOSI  19
 TFT_SCLK  18
-TFT_CS    15 // Chip select control pin
-TFT_DC    2 // Data Command control pin
-TFT_RST   13 // Reset pin (could connect to RST pin)
-TOUCH_CS  21 // Chip select pin (T_CS) of touch screen
+TFT_CS    13 // Chip select control pin
+TFT_DC    15 // Data Command control pin
+TFT_RST   2 // Reset pin (could connect to RST pin)
+TOUCH_CS  12 // Chip select pin (T_CS) of touch screen
 
 P.S. Check them in lib/TFT_eSPI/User_Setup.h
 P.P.S. TFT and Touchscreen are using VSPI, transactions (To work with other devices on the bus) are automatically enabled by TFT_eSPI for an ESP32 (to use HAL mutex)
@@ -930,7 +930,7 @@ void TFTTask(void * pvParameters)
                 scene = 1;
                 break;
             }
-            delay(100);
+            delay(200);
         }
         delay(25);
     }
@@ -1020,9 +1020,9 @@ void UARTRecvTask(void * pvParameters)
     char tmp; // Variable to temporarily save the char coming from UART
     while (1)
     {
-        if (Serial.available())
+        if (Serial1.available())
         {
-            tmp = Serial.read();
+            tmp = Serial1.read();
             xQueueSend(SerialFIFO, &tmp, 0); // Insert item into the queue
             if (isSDCardInserted) // Save log file to SD Card
             {
@@ -1044,6 +1044,7 @@ void TestTask(void * pvParameters)
     {
         Log("[%u] System is running", millis());
         //Log(NTP.getTimeDateString().c_str());
+        Serial1.printf("STM32 UART Test!\r\n");
         delay(5000);
     }
     vTaskDelete(NULL);

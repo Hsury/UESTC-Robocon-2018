@@ -4,3 +4,4 @@
 .pioenvs
 .piolibdeps
 .vscode/launch.json
+.vscode/*.db
