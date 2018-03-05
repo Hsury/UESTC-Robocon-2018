@@ -13,7 +13,7 @@
                         ===== UESTC Robot Probe For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/02/24
+                                        VERSION 2018/03/05
 
 */
 
@@ -21,11 +21,9 @@
 
 /*
 TODO List:
-1, Fix high-posibility speaker explosion when volume is set above 20
-2. Optimize Wi-Fi connection stability
-3. Complete variable logging system
-4. Complete selftest system
-5. Add Competition/Debug dual mode
+1. Complete variable logging system
+2. Complete selftest system
+3. Add Competition/Debug dual mode
 */
 
 #include <Arduino.h>
@@ -51,9 +49,10 @@ TODO List:
 #include "bitmap.h"
 
 #define HW_NAME "AutoRobot"
-#define SW_NAME "20180224"
+#define SW_NAME "20180305"
 
 #define ENABLE_TOUCH_CALIBRATE 0
+#define ENABLE_CAN_DEBUG 0
 #define UPDATE_RTC_TIME 0
 #define NOTIFY_DEVICE_NUM 5
 
@@ -104,7 +103,9 @@ P.P.S. TFT and Touchscreen are using VSPI, transactions (To work with other devi
 #define DT35_H_ID 0x50
 #define DT35_F_ID 0x51
 #define DT35_R_ID 0x52
-#define TouchScreen_ID 0x15
+#define TouchScreen_ID 0x60
+#define Cradle_ID 0x72
+#define Hint_Tone_ID 0x74
 
 /*
 CAN Device Table
@@ -138,6 +139,11 @@ BY8X0116P audioController(Serial2, AUDIO_BUSY_PIN);
 TFT_eSPI tft = TFT_eSPI();
 RemoteDebug Debug;
 FtpServer ftpSrv;
+
+File externalLogFile;
+File CANLogFile;
+File UARTLogFile;
+File UARTTextFile;
 
 TaskHandle_t WiFiStationTaskHandle;
 TaskHandle_t AudioTaskHandle;
@@ -188,10 +194,11 @@ void writeConfig();
 void Log(const char * format, ...);
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(921600);
     Serial.println();
 
     Serial1.begin(115200, SERIAL_8N1, UART1_RX_PIN, UART1_TX_PIN);
+    pinMode(UART1_RX_PIN, INPUT_PULLUP); // Enable internal pull-up resistance to avoid messy code
     Serial2.begin(9600, SERIAL_8N1, UART2_RX_PIN, UART2_TX_PIN);
 
     SPI2.begin(HSPI_SCLK_PIN, HSPI_MISO_PIN, HSPI_MOSI_PIN);
@@ -200,10 +207,11 @@ void setup() {
     CAN_cfg.speed = CAN_SPEED_1000KBPS; // Set CAN Bus speed to 1Mbps
     CAN_cfg.tx_pin_id = CAN_TX_PIN; // Set CAN TX Pin
     CAN_cfg.rx_pin_id = CAN_RX_PIN; // Set CAN RX Pin
-    CAN_cfg.rx_queue = xQueueCreate(10, sizeof(CAN_frame_t)); // Create CAN RX Queue
+    CAN_cfg.rx_queue = xQueueCreate(16, sizeof(CAN_frame_t)); // Create CAN RX Queue
     ESP32Can.CANInit(); // Start CAN module
 
     setSyncProvider(RTC.get); // Try to sync with RTC
+    Log("Boot time: %4d/%02d/%02d %02d:%02d:%02d", year(), month(), day(), hour(), minute(), second());
     sprintf(BootTimePrefix, "%4d_%02d_%02d_%02d_%02d_%02d_", year(), month(), day(), hour(), minute(), second());
 
     if (SD.begin(SD_CARD_CS_PIN, SPI2)) // Detect SD Card
@@ -221,6 +229,13 @@ void setup() {
             Log(" - Size: %llu MB", cardSize);
             Log(" - Total: %llu MB", SD.totalBytes() / (1024 * 1024));
             Log(" - Used: %llu MB", SD.usedBytes() / (1024 * 1024));
+            externalLogFile = SD.open("/" + String(BootTimePrefix) + "Syslog.csv", FILE_APPEND);
+            if (externalLogFile) externalLogFile.println("Time,Millis,Log,");
+            CANLogFile = SD.open("/" + String(BootTimePrefix) + "CAN.csv", FILE_APPEND);
+            if (CANLogFile) CANLogFile.println("Time,Millis,Pack No.,ID,Length,Byte[0],Byte[1],Byte[2],Byte[3],Byte[4],Byte[5],Byte[6],Byte[7],");
+            UARTLogFile = SD.open("/" + String(BootTimePrefix) + "UART.csv", FILE_APPEND);
+            if (UARTLogFile) UARTLogFile.println("Time,Millis,Hex,Char,");
+            UARTTextFile = SD.open("/" + String(BootTimePrefix) + "UART.txt", FILE_APPEND);
         }
     }
     // NOTE: ESP32 has MMC Controller, not using here mainly because it needs more pins and the pins cannot be remapped
@@ -279,11 +294,11 @@ void setup() {
     }
 
     tft.init();
-    tft.setRotation(3);
+    tft.setRotation(1);
     #if ENABLE_TOUCH_CALIBRATE
     TouchscreenCalibrate();
     #endif
-    uint16_t calData[5] = {231, 3590, 156, 3560, 3};
+    uint16_t calData[5] = {255, 3563, 157, 3553, 5};
     tft.setTouch(calData);
     tft.fillScreen(TFT_WHITE);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -296,7 +311,7 @@ void setup() {
 
     Debug.begin(HW_NAME); // Initiaze the telnet server
     Debug.setResetCmdEnabled(true); // Enable the reset command
-    String helpCmd = "play - Drive the speaker\n";
+    String helpCmd = "play - Drive the speaker\r\n";
 	helpCmd.concat("uestc - emmmm");
 	Debug.setHelpProjectsCmds(helpCmd);
 	Debug.setCallBackProjectCmds(&processCmdRemoteDebug);
@@ -398,7 +413,6 @@ void WiFiStationTask(void * pvParameters)
             isWiFiConnected = true;
             IPAddress STAIP = WiFi.localIP();
             Log("WiFi connected");
-            Log(" - SSID: %s", WiFi.SSID());
             Log(" - IP: %u.%u.%u.%u", STAIP[0], STAIP[1], STAIP[2], STAIP[3]);
             ArduinoOTA.end();
             ArduinoOTA.setHostname(HW_NAME); // Equals to the parameter in function MDNS.begin(HW_NAME)
@@ -428,21 +442,25 @@ void AudioTask(void * pvParameters)
     /*
     Audio File List
 
-    001启动音乐.mp3
-    002提示音.mp3
-    003NetworkConnected.mp3
-    004自检开始.mp3
-    005自检通过.mp3
-    006自检未通过.mp3
-    007底盘主控掉线.mp3
-    008云台主控掉线.mp3
-    009陀螺仪与码盘掉线.mp3
-    010号电机掉线.mp3
-    011号激光掉线.mp3
-    012一.mp3
-    013二.mp3
-    014三.mp3
-    015四.mp3
+    001 启动音乐.mp3
+    002 提示音.mp3
+    003 网络已连接.wav
+    004 开始自检.wav
+    005 自检通过.wav
+    006 自检未通过.wav
+    007 底盘主控掉线.wav
+    008 云台主控掉线.wav
+    009 陀螺仪与码盘掉线.wav
+    010 号电机掉线.wav
+    011 号激光掉线.wav
+    012 一.wav
+    013 二.wav
+    014 三.wav
+    015 四.wav
+    016 已到达TZ1.wav
+    017 已到达TZ2.wav
+    018 已到达TZ3.wav
+    019 我来扔个球.wav
     */
     
     while (1)
@@ -459,8 +477,22 @@ void AudioTask(void * pvParameters)
 
 void TFTTask(void * pvParameters)
 {
+    /*
+    Scene List
+
+    0 = Booting
+    1 = Main
+    2 = Selftest
+    3 = Variable
+    4 = Settings
+    5 = Log
+    6 = CAN
+    7 = UART
+    */
+
     uint8_t scene = 0;
     uint8_t subScene = 0;
+    boolean redraw = true; // Whether to redraw static parts of a scene
     uint16_t xPos = 0, yPos = 16; // To store command interface coordinates
     boolean pressed;
     uint16_t xTouch = 0, yTouch = 0; // To store the touch coordinates
@@ -479,13 +511,18 @@ void TFTTask(void * pvParameters)
             delay(1000);
             tft.pushImage((320 - 300) / 2, (240 - 116) / 2, 300, 116, bitmap_robocon); // Display Robocon 2018 LOGO
             delay(1000);
-            tft.pushImage(0, 0, 320, 240, bitmap_main);
-            tft.setCursor(0, 0);
-            tft.printf("HW: %s\r\nSW: %s", HW_NAME, SW_NAME);
             scene = 1;
+            redraw = true;
             break;
 
             case 1: // @Main
+            if (redraw)
+            {
+                tft.pushImage(0, 0, 320, 240, bitmap_main);
+                tft.setCursor(0, 0);
+                tft.printf("HW: %s\r\nSW: %s\r\nMS:", HW_NAME, SW_NAME);
+                redraw = false;
+            }
             if (isWiFiConnected) tft.pushImage(320 - 24, 0, 24, 24, bitmap_wifi_connected);
             else tft.pushImage(320 - 24, 0, 24, 24, bitmap_wifi_disconnected);
             trayPos = 1; // Reset the tray position
@@ -505,14 +542,78 @@ void TFTTask(void * pvParameters)
                 trayPos++;
             }
             tft.fillRect(320 - 24 * (5 + 1), 0, 24 * (5 - trayPos + 1), 24, TFT_BLACK); // Erase icons left, assumes that the maximum number of icons is 5 (exclude WiFi)
-            tft.setCursor(0, 32);
-            tft.printf("MS: %u", millis());
+            tft.setCursor(27, 32);
+            tft.printf("%u", millis());
+            char clockStr[20];
+            sprintf(clockStr, "%4d/%02d/%02d %02d:%02d:%02d", year(), month(), day(), hour(), minute(), second());
+            tft.setTextDatum(TR_DATUM);
+            tft.drawString(clockStr, 319, 32);
+            tft.setTextDatum(TL_DATUM);
             break;
 
             case 2: // @Selftest
+            if (redraw)
+            {
+                tft.fillScreen(TFT_BLACK);
+                tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
+                tft.pushImage(288, 0, 32, 32, bitmap_refresh, TFT_BLACK);
+
+                tft.pushImage(128, 32, 32, 32, bitmap_pass, TFT_BLACK); // Make black as transparent color
+                tft.pushImage(192, 32, 32, 32, bitmap_fail, TFT_BLACK); // Make black as transparent color
+
+                tft.drawRect(32, 80, 80, 50, TFT_WHITE);
+                tft.setTextDatum(CC_DATUM);
+                tft.drawString("Skip ST", 72 , 105);
+                tft.setTextDatum(TL_DATUM);
+
+                tft.drawRect(32, 160, 80, 50, TFT_WHITE);
+                tft.setTextDatum(CC_DATUM);
+                tft.drawString("Launch", 72 , 185);
+                tft.setTextDatum(TL_DATUM);
+                redraw = false;
+            }
             break;
 
             case 3: // @Variable
+            if (redraw)
+            {
+                tft.fillScreen(TFT_BLACK);
+                tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
+                tft.pushImage(32, 0, 32, 32, bitmap_prev, TFT_BLACK);
+                tft.pushImage(256, 0, 32, 32, bitmap_next, TFT_BLACK);
+                tft.pushImage(288, 0, 32, 32, bitmap_record_begin, TFT_BLACK);
+                switch (subScene)
+                {
+                    case 0: // @Variable.Summary
+                    tft.setFreeFont(&FreeSans9pt7b);
+                    tft.setTextDatum(R_BASELINE);
+                    tft.drawString("Gyro:", 144, 64);
+                    tft.drawString("Encoder[X]:", 144, 88);
+                    tft.drawString("Encoder[Y]:", 144, 112);
+                    tft.drawString("DT35[H]:", 144, 136);
+                    tft.drawString("DT35[F]:", 144, 160);
+                    tft.drawString("DT35[R]:", 144, 184);
+                    tft.setTextFont(2);
+                    tft.setTextDatum(TL_DATUM);
+                    break;
+
+                    case 1: // @Variable.TouchScreen
+                    tft.setTextDatum(CC_DATUM);
+                    tft.drawString("TouchScreen", 160, 42);
+                    tft.setTextDatum(TL_DATUM);
+                    tft.drawRect(20, 70, 280, 160, TFT_WHITE);
+                    break;
+                }
+                redraw = false;
+            }
+            tft.setTextDatum(TC_DATUM);
+            tft.setTextPadding(192);
+            tft.drawString("FSM Code: 12", 160 , 0);
+            tft.drawString("Waiting for launch command", 160 , 16);
+            tft.setTextDatum(TL_DATUM);
+            tft.setTextPadding(0);
+            if (isRecording) tft.pushImage(288, 0, 32, 32, bitmap_record_stop, TFT_BLACK);
+            else tft.pushImage(288, 0, 32, 32, bitmap_record_begin, TFT_BLACK);
             switch (subScene)
             {
                 case 0:
@@ -532,8 +633,8 @@ void TFTTask(void * pvParameters)
 
                 case 1:
                 tft.setTextDatum(CC_DATUM);
-                tft.setTextPadding(128);
-                tft.drawString(String(TouchScreen[0]) + ", " + String(TouchScreen[1]), 160, 60);
+                tft.setTextPadding(108);
+                tft.drawString('(' + String(TouchScreen[0]) + ", " + String(TouchScreen[1]) + ')', 160, 60);
                 tft.setTextDatum(TL_DATUM);
                 tft.setTextPadding(0);
                 if (TouchScreen[0] && TouchScreen[1])
@@ -548,34 +649,81 @@ void TFTTask(void * pvParameters)
             break;
 
             case 4: // @Settings
+            if (redraw)
+            {
+                tft.fillScreen(TFT_BLACK);
+                tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
+                if (isSDCardInserted) tft.pushImage(256, 0, 32, 32, bitmap_eject_sdcard, TFT_BLACK);
+                tft.pushImage(288, 0, 32, 32, bitmap_power, TFT_BLACK);
+                tft.setFreeFont(&FreeSans9pt7b);
+
+                tft.setTextDatum(R_BASELINE);
+                tft.drawString("Volume:", 144 , 48); // <Space> does not take up any place
+                tft.pushImage(160, 28, 32, 32, bitmap_volume_down, TFT_BLACK);
+                tft.setTextDatum(C_BASELINE);
+                tft.drawString(String(config.volume), 208 , 48);
+                tft.pushImage(224, 28, 32, 32, bitmap_volume_up, TFT_BLACK);
+
+                tft.setTextDatum(R_BASELINE);
+                tft.drawString("Hide SSID:", 144 , 84);
+                if (config.hideSSID) tft.pushImage(160, 64, 54, 32, bitmap_switch_on, TFT_BLACK);
+                else tft.pushImage(160, 64, 54, 32, bitmap_switch_off, TFT_BLACK);
+
+                tft.drawString("Raw UART:", 144 , 120);
+                if (config.rawUART) tft.pushImage(160, 100, 54, 32, bitmap_switch_on, TFT_BLACK);
+                else tft.pushImage(160, 100, 54, 32, bitmap_switch_off, TFT_BLACK);
+
+                tft.setTextFont(2);
+                tft.setTextDatum(TL_DATUM);
+                redraw = false;
+            }
             break;
 
             case 5: // @Log
-            if (ulTaskNotifyTake(pdTRUE, 0) == 1)
+            if (redraw)
             {
-                RefreshLog: // Force refresh log label
-                if (LogFollow) LogPage = (LogPtr - 1) / 13 + 1; // [0, 13] => 1; [14, 26] => 2
-                tft.setTextDatum(CC_DATUM);
-                tft.fillRect(64, 0, 192, 32, TFT_BLACK);
-                tft.drawString("Page " + String(LogPage) + "/" + String((LogPtr - 1) / 13 + 1) + ", " + String(LogPtr) + " records", 160 , 16);
-                tft.setTextDatum(TL_DATUM);
-                tft.setCursor(0, 32);
-                for (uint8_t i = 0; i < 13; i++)
-                {
-                    tft.fillRect(0, 32 + i * 16, 320, 16, TFT_BLACK);
-                    tft.println(LogHistory[i + (LogPage - 1) * 13]);
-                }
+                tft.fillScreen(TFT_BLACK);
+                tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
+                tft.pushImage(32, 0, 32, 32, bitmap_prev, TFT_BLACK);
+                tft.pushImage(256, 0, 32, 32, bitmap_next, TFT_BLACK);
+                tft.pushImage(288, 0, 32, 32, bitmap_clear, TFT_BLACK);
+                redraw = false;
             }
+            if (LogFollow) LogPage = (LogPtr - 1) / 13 + 1; // [0, 13] => 1; [14, 26] => 2
+            tft.setTextDatum(CC_DATUM);
+            tft.setTextPadding(192);
+            tft.drawString("Page " + String(LogPage) + "/" + String((LogPtr - 1) / 13 + 1) + ", " + String(LogPtr) + " records", 160 , 16);
+            tft.setTextDatum(TL_DATUM);
+            tft.setTextPadding(320);
+            for (uint8_t i = 0; i < 13; i++)
+            {
+                tft.drawString(LogHistory[i + (LogPage - 1) * 13], 0, 32 + i * 16);
+            }
+            tft.setTextPadding(0);
             break;
             
             case 6: // @CAN Bus Monitor interface
-            if (!pause && ulTaskNotifyTake(pdTRUE, 0) == 2) // If task is notified, which means that a new CAN frame has come, refresh the screen
+            if (redraw)
             {
+                tft.fillScreen(TFT_BLACK);
+                tft.fillRect(0, 0, 320, 16, TFT_RED); // Draw red title bar
+                tft.setTextColor(TFT_WHITE, TFT_RED);
+                tft.setTextDatum(CC_DATUM); // Text align to Centre-Centre, same as MC_DATUM
+                tft.drawString("CAN Bus Monitor", 160 , 8);
+                tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                tft.setTextDatum(TL_DATUM); // Text align to Top-Left
+                xPos = 0;
+                yPos = 16;
+                redraw = false;
+            }
+            if (!pause && ulTaskNotifyTake(pdTRUE, 0)) // If task is notified, which means that a new CAN frame has come, refresh the screen
+            {
+                CAN_frame_t CAN_rx_frame_holder = CAN_rx_frame; // Avoid data being updated when displayed
                 tft.setCursor(0, yPos);
-                tft.printf("%u, ID: %d, Data: ", packNum, CAN_rx_frame.MsgID);
-                for (uint8_t i = 0; i < CAN_rx_frame.FIR.B.DLC; i++)
+                tft.printf("%-7u  |  0x%-4X  | ", packNum, CAN_rx_frame_holder.MsgID);
+                for (uint8_t i = 0; i < CAN_rx_frame_holder.FIR.B.DLC; i++)
                 {
-                    tft.printf("%02x ", CAN_rx_frame.data.u8[i]);
+                    tft.printf(" %02X", CAN_rx_frame_holder.data.u8[i]);
                 }
                 yPos += 16;
                 if (yPos >= 240) yPos = 16;
@@ -584,6 +732,19 @@ void TFTTask(void * pvParameters)
             break;
 
             case 7: // @UART Monitor interface
+            if (redraw)
+            {
+                tft.fillScreen(TFT_BLACK);
+                tft.fillRect(0, 0, 320, 16, TFT_BLUE); // Draw blue title bar
+                tft.setTextColor(TFT_WHITE, TFT_BLUE);
+                tft.setTextDatum(CC_DATUM); // Text align to Centre-Centre, same as MC_DATUM
+                tft.drawString("UART Monitor", 160 , 8);
+                tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                tft.setTextDatum(TL_DATUM); // Text align to Top-Left
+                xPos = 0;
+                yPos = 16;
+                redraw = false;
+            }
             while (!pause && xQueueReceive(SerialFIFO, &tmp, 0) == pdTRUE)
             {
                 if (!config.rawUART)
@@ -604,7 +765,7 @@ void TFTTask(void * pvParameters)
                 else
                 {
                     tft.setCursor(xPos, yPos);
-                    tft.printf("%02x", tmp);
+                    tft.printf("%02X", tmp);
                     xPos += 20;
                     if (xPos >= 320)
                     {
@@ -617,7 +778,9 @@ void TFTTask(void * pvParameters)
             }
             break;
         }
+        if (scene != 6) delay(50); // Disable screen refresh interval when CAN bus monitor is turned on
         // Touchscreen control code is below
+        if (pressed) delay(100); // Touchscreen pressed seperator
         pressed = tft.getTouch(&xTouch, &yTouch); 
         if (pressed)
         {
@@ -628,133 +791,38 @@ void TFTTask(void * pvParameters)
                 case 1: // @Main
                 if (xTouch >= 13 && xTouch <= 152 && yTouch >= 57 && yTouch <= 106) // => Selftest
                 {
-                    tft.fillScreen(TFT_BLACK);
-                    tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
-                    tft.pushImage(288, 0, 32, 32, bitmap_refresh, TFT_BLACK);
-
-                    tft.pushImage(128, 32, 32, 32, bitmap_pass, TFT_BLACK); // Make black as transparent color
-                    tft.pushImage(192, 32, 32, 32, bitmap_fail, TFT_BLACK); // Make black as transparent color
-
-                    tft.drawRect(32, 80, 80, 50, TFT_WHITE);
-                    tft.setTextDatum(CC_DATUM);
-                    tft.drawString("Skip ST", 72 , 105);
-                    tft.setTextDatum(TL_DATUM);
-
-                    tft.drawRect(32, 160, 80, 50, TFT_WHITE);
-                    tft.setTextDatum(CC_DATUM);
-                    tft.drawString("Launch", 72 , 185);
-                    tft.setTextDatum(TL_DATUM);
-
                     scene = 2;
+                    redraw = true;
                 }
                 else if (xTouch >= 167 && xTouch <= 306 && yTouch >= 57 && yTouch <= 106) // => Variable
                 {
-                    tft.fillScreen(TFT_BLACK);
-                    tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
-                    tft.pushImage(32, 0, 32, 32, bitmap_prev, TFT_BLACK);
-                    tft.setTextDatum(TC_DATUM);
-                    tft.drawString("FSM Code: 12", 160 , 0);
-                    tft.drawString("Waiting for launch command", 160 , 16);
-                    tft.setTextDatum(TL_DATUM);
-                    tft.pushImage(256, 0, 32, 32, bitmap_next, TFT_BLACK);
-                    if (isRecording) tft.pushImage(288, 0, 32, 32, bitmap_record_stop, TFT_BLACK);
-                    else tft.pushImage(288, 0, 32, 32, bitmap_record_begin, TFT_BLACK);
                     scene = 3;
                     //subScene = 0; // Uncomment this line to forget footprint
-                    RefreshVariableFrame:
-                    switch (subScene)
-                    {
-                        case 0: // @Variable.Summary
-                        tft.setFreeFont(&FreeSans9pt7b);
-                        tft.setTextDatum(R_BASELINE);
-                        tft.drawString("Gyro:", 144, 64);
-                        tft.drawString("Encoder[X]:", 144, 88);
-                        tft.drawString("Encoder[Y]:", 144, 112);
-                        tft.drawString("DT35[H]:", 144, 136);
-                        tft.drawString("DT35[F]:", 144, 160);
-                        tft.drawString("DT35[R]:", 144, 184);
-                        tft.setTextFont(2);
-                        tft.setTextDatum(TL_DATUM);
-                        break;
-
-                        case 1: // @Variable.TouchScreen
-                        tft.setTextDatum(CC_DATUM);
-                        tft.drawString("TouchScreen", 160, 42);
-                        tft.setTextDatum(TL_DATUM);
-                        tft.drawRect(20, 70, 280, 160, TFT_WHITE);
-                        break;
-                    }
+                    redraw = true;
                 }
                 else if (xTouch >= 13 && xTouch <= 152 && yTouch >= 117 && yTouch <= 166) // => Settings
                 {
-                    tft.fillScreen(TFT_BLACK);
-                    tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
-                    if (isSDCardInserted) tft.pushImage(256, 0, 32, 32, bitmap_eject_sdcard, TFT_BLACK);
-                    tft.pushImage(288, 0, 32, 32, bitmap_power, TFT_BLACK);
-                    tft.setFreeFont(&FreeSans9pt7b);
-
-                    tft.setTextDatum(R_BASELINE);
-                    tft.drawString("Volume:", 144 , 48); // <Space> does not take up any place
-                    tft.pushImage(160, 28, 32, 32, bitmap_volume_down, TFT_BLACK);
-                    tft.setTextDatum(C_BASELINE);
-                    tft.drawString(String(config.volume), 208 , 48);
-                    tft.pushImage(224, 28, 32, 32, bitmap_volume_up, TFT_BLACK);
-
-                    tft.setTextDatum(R_BASELINE);
-                    tft.drawString("Hide SSID:", 144 , 84);
-                    if (config.hideSSID) tft.pushImage(160, 64, 54, 32, bitmap_switch_on, TFT_BLACK);
-                    else tft.pushImage(160, 64, 54, 32, bitmap_switch_off, TFT_BLACK);
-
-                    tft.drawString("Raw UART:", 144 , 120);
-                    if (config.rawUART) tft.pushImage(160, 100, 54, 32, bitmap_switch_on, TFT_BLACK);
-                    else tft.pushImage(160, 100, 54, 32, bitmap_switch_off, TFT_BLACK);
-
-                    tft.setTextFont(2);
-                    tft.setTextDatum(TL_DATUM);
                     scene = 4;
+                    redraw = true;
                 }
                 else if (xTouch >= 167 && xTouch <= 306 && yTouch >= 117 && yTouch <= 166) // => Log
                 {
-                    tft.fillScreen(TFT_BLACK);
-                    tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
-                    tft.pushImage(32, 0, 32, 32, bitmap_prev, TFT_BLACK);
-                    tft.setTextDatum(CC_DATUM);
                     LogPage = (LogPtr - 1) / 13 + 1;
-                    tft.drawString("Page " + String(LogPage) + "/" + String((LogPtr - 1) / 13 + 1) + ", " + String(LogPtr) + " records", 160 , 16);
-                    tft.setTextDatum(TL_DATUM);
-                    tft.pushImage(256, 0, 32, 32, bitmap_next, TFT_BLACK);
-                    tft.pushImage(288, 0, 32, 32, bitmap_clear, TFT_BLACK);
                     LogFollow = true;
                     scene = 5;
-                    goto RefreshLog;
+                    redraw = true;
                 }
                 else if (xTouch >= 13 && xTouch <= 152 && yTouch >= 177 && yTouch <= 226) // => CAN
                 {
-                    tft.fillScreen(TFT_BLACK);
-                    tft.fillRect(0, 0, 320, 16, TFT_RED); // Draw red title bar
-                    tft.setTextColor(TFT_WHITE, TFT_RED);
-                    tft.setTextDatum(CC_DATUM); // Text align to Centre-Centre, same as MC_DATUM
-                    tft.drawString("CAN Bus Monitor", 160 , 8);
-                    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-                    tft.setTextDatum(TL_DATUM); // Text align to Top-Left
-                    xPos = 0;
-                    yPos = 16;
                     pause = false;
                     scene = 6;
+                    redraw = true;
                 }
                 else if (xTouch >= 167 && xTouch <= 306 && yTouch >= 177 && yTouch <= 226) // => UART
                 {
-                    tft.fillScreen(TFT_BLACK);
-                    tft.fillRect(0, 0, 320, 16, TFT_BLUE); // Draw blue title bar
-                    tft.setTextColor(TFT_WHITE, TFT_BLUE);
-                    tft.setTextDatum(CC_DATUM); // Text align to Centre-Centre, same as MC_DATUM
-                    tft.drawString("UART Monitor", 160 , 8);
-                    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-                    tft.setTextDatum(TL_DATUM); // Text align to Top-Left
-                    xPos = 0;
-                    yPos = 16;
                     pause = false;
                     scene = 7;
+                    redraw = true;
                 }
                 break;
 
@@ -791,26 +859,26 @@ void TFTTask(void * pvParameters)
                 {
                     if (subScene > 0) subScene--;
                     else subScene = 1;
-                    tft.fillRect(0, 32, 320, 208, TFT_BLACK);
-                    goto RefreshVariableFrame;
+                    redraw = true;
                 }
                 else if (xTouch >= 256 && xTouch <= 288 && yTouch >= 0 && yTouch <= 32) // Next page
                 {
                     if (subScene < 1) subScene++;
                     else subScene = 0;
-                    tft.fillRect(0, 32, 320, 208, TFT_BLACK);
-                    goto RefreshVariableFrame;
+                    redraw = true;
                 }
                 else if (xTouch >= 288 && xTouch <= 320 && yTouch >= 0 && yTouch <= 32) // Switch whether to record
                 {
                     isRecording = !isRecording;
-                    if (isRecording) tft.pushImage(288, 0, 32, 32, bitmap_record_stop, TFT_BLACK);
-                    else tft.pushImage(288, 0, 32, 32, bitmap_record_begin, TFT_BLACK);
                 }
                 break;
 
                 case 4: // @Settings
-                if (xTouch >= 0 && xTouch <= 32 && yTouch >= 0 && yTouch <= 32) goto Home; // Home
+                if (xTouch >= 0 && xTouch <= 32 && yTouch >= 0 && yTouch <= 32) // Home
+                {
+                    writeConfig();
+                    goto Home;
+                }
                 else if (xTouch >= 256 && xTouch <= 288 && yTouch >= 0 && yTouch <= 32) // Eject SD Card
                 {
                     if (isSDCardInserted)
@@ -818,12 +886,24 @@ void TFTTask(void * pvParameters)
                         isSDCardInserted = false;
                         tft.fillRect(256, 0, 32, 32, TFT_BLACK); // Remove SD Card Icon
                         Log("SD Card unmounted");
+                        if (externalLogFile) externalLogFile.close();
+                        if (CANLogFile) CANLogFile.close();
+                        if (UARTLogFile) UARTLogFile.close();
+                        if (UARTTextFile) UARTTextFile.close();
                         SD.end();
                     }
                 }
                 else if (xTouch >= 288 && xTouch <= 320 && yTouch >= 0 && yTouch <= 32) // Reboot
                 {
-                    if (isSDCardInserted) SD.end();
+                    writeConfig();
+                    if (isSDCardInserted)
+                    {
+                        if (externalLogFile) externalLogFile.close();
+                        if (CANLogFile) CANLogFile.close();
+                        if (UARTLogFile) UARTLogFile.close();
+                        if (UARTTextFile) UARTTextFile.close();
+                        SD.end();
+                    }
                     SPIFFS.end();
                     ESP.restart();
                 }
@@ -837,7 +917,6 @@ void TFTTask(void * pvParameters)
                     tft.setTextFont(2);
                     tft.setTextDatum(TL_DATUM);
                     audioController.setVolume(config.volume);
-                    writeConfig();
                 }
                 else if (xTouch >= 224 && xTouch <= 256 && yTouch >= 28 && yTouch <= 60) // Volume up
                 {
@@ -849,21 +928,18 @@ void TFTTask(void * pvParameters)
                     tft.setTextFont(2);
                     tft.setTextDatum(TL_DATUM);
                     audioController.setVolume(config.volume);
-                    writeConfig();
                 }
                 else if (xTouch >= 160 && xTouch <= 214 && yTouch >= 64 && yTouch <= 96) // Switch whether to hide SSID
                 {
                     config.hideSSID = !config.hideSSID;
                     if (config.hideSSID) tft.pushImage(160, 64, 54, 32, bitmap_switch_on, TFT_BLACK);
                     else tft.pushImage(160, 64, 54, 32, bitmap_switch_off, TFT_BLACK);
-                    writeConfig();
                 }
                 else if (xTouch >= 160 && xTouch <= 214 && yTouch >= 100 && yTouch <= 132) // Switch whether to print raw UART data
                 {
                     config.rawUART = !config.rawUART;
                     if (config.rawUART) tft.pushImage(160, 100, 54, 32, bitmap_switch_on, TFT_BLACK);
                     else tft.pushImage(160, 100, 54, 32, bitmap_switch_off, TFT_BLACK);
-                    writeConfig();
                 }
                 break; // Do not response to blank zone
 
@@ -891,7 +967,8 @@ void TFTTask(void * pvParameters)
                     for (uint16_t i = 0; i < 260; i++) LogHistory[i] = "";
                     LogPtr = 0;
                 }
-                goto RefreshLog;
+                else break;
+                redraw = true;
                 break;
 
                 case 6: // @CAN
@@ -924,15 +1001,11 @@ void TFTTask(void * pvParameters)
 
                 Home:
                 default: // => Main
-                tft.pushImage(0, 0, 320, 240, bitmap_main);
-                tft.setCursor(0, 0);
-                tft.printf("HW: %s\r\nSW: %s", HW_NAME, SW_NAME);
                 scene = 1;
+                redraw = true;
                 break;
             }
-            delay(200);
         }
-        delay(25);
     }
     vTaskDelete(NULL);
 }
@@ -941,58 +1014,88 @@ void CANRecvTask(void * pvParameters)
 {
     while (1)
     {
-        if (xQueueReceive(CAN_cfg.rx_queue, &CAN_rx_frame, 3 * portTICK_PERIOD_MS) == pdTRUE)
+        //Serial.printf("CAN Rx queue usage: %u\r\n", uxQueueMessagesWaiting(CAN_cfg.rx_queue));
+        xQueueReceive(CAN_cfg.rx_queue, &CAN_rx_frame, portMAX_DELAY);
+        packNum++;
+        if (CAN_rx_frame.FIR.B.FF == CAN_frame_std && CAN_rx_frame.FIR.B.RTR != CAN_RTR) // Software CAN filter
         {
-            packNum++;
-            if (CAN_rx_frame.FIR.B.FF == CAN_frame_std && CAN_rx_frame.FIR.B.RTR != CAN_RTR) // Software CAN filter
+            switch (CAN_rx_frame.MsgID)
             {
-                switch (CAN_rx_frame.MsgID)
+                case Gyroscope_ID:
+                DeviceNotify[0] = millis();
+                memcpy(&Gyroscope, &CAN_rx_frame.data.u8[0], 4);
+                break;
+
+                case Encoder_ID:
+                DeviceNotify[1] = millis();
+                memcpy(&Encoder[0], &CAN_rx_frame.data.u8[0], 4);
+                memcpy(&Encoder[1], &CAN_rx_frame.data.u8[4], 4);
+                break;
+
+                case DT35_H_ID:
+                DeviceNotify[2] = millis();
+                memcpy(&DT35[0], &CAN_rx_frame.data.u8[0], 4);
+                break;
+
+                case DT35_F_ID:
+                DeviceNotify[3] = millis();
+                memcpy(&DT35[1], &CAN_rx_frame.data.u8[0], 4);
+                break;
+
+                case DT35_R_ID:
+                DeviceNotify[4] = millis();
+                memcpy(&DT35[2], &CAN_rx_frame.data.u8[0], 4);
+                break;
+
+                case TouchScreen_ID:
+                memcpy(&TouchScreen[0], &CAN_rx_frame.data.u8[0], 2);
+                memcpy(&TouchScreen[1], &CAN_rx_frame.data.u8[2], 2);
+                break;
+
+                case Cradle_ID:
+                if (CAN_rx_frame.data.u8[0] == 0xAA) // Base reports that it has arrived in TZx
                 {
-                    case Gyroscope_ID:
-                    DeviceNotify[0] = millis();
-                    memcpy(&Gyroscope, &CAN_rx_frame.data.u8[0], 4);
-                    break;
-
-                    case Encoder_ID:
-                    DeviceNotify[1] = millis();
-                    memcpy(&Encoder[0], &CAN_rx_frame.data.u8[0], 4);
-                    memcpy(&Encoder[1], &CAN_rx_frame.data.u8[4], 4);
-                    break;
-
-                    case DT35_H_ID:
-                    DeviceNotify[2] = millis();
-                    memcpy(&DT35[0], &CAN_rx_frame.data.u8[0], 4);
-                    break;
-
-                    case DT35_F_ID:
-                    DeviceNotify[3] = millis();
-                    memcpy(&DT35[1], &CAN_rx_frame.data.u8[0], 4);
-                    break;
-
-                    case DT35_R_ID:
-                    DeviceNotify[4] = millis();
-                    memcpy(&DT35[2], &CAN_rx_frame.data.u8[0], 4);
-                    break;
-
-                    case TouchScreen_ID:
-                    memcpy(&TouchScreen[0], &CAN_rx_frame.data.u8[0], 2);
-                    memcpy(&TouchScreen[1], &CAN_rx_frame.data.u8[2], 2);
-                    break;
+                    if (CAN_rx_frame.data.u8[1] == 0x01) // In TZ1
+                    {
+                        Log("Robot arrived in TZ1\r\n");
+                        AddToPlaylist(2);
+                        AddToPlaylist(16);
+                    }
+                    else if (CAN_rx_frame.data.u8[1] == 0x02) // In TZ2
+                    {
+                        Log("Robot arrived in TZ2\r\n");
+                        AddToPlaylist(2);
+                        AddToPlaylist(17);
+                    }
+                    else if (CAN_rx_frame.data.u8[1] == 0x03) // In TZ3
+                    {
+                        Log("Robot arrived in TZ3\r\n");
+                        AddToPlaylist(2);
+                        AddToPlaylist(18);
+                    }
                 }
-            }
-            if (TFTTaskHandle) xTaskNotify(TFTTaskHandle, 2, eSetValueWithOverwrite); //xTaskNotifyGive(TFTTaskHandle);
-            if (isSDCardInserted) // Save log file to SD Card
-            {
-                File CANLogFile = SD.open("/" + String(BootTimePrefix) + "CAN.csv", FILE_APPEND);
-                if (CANLogFile)
+                break;
+
+                case Hint_Tone_ID:
+                if (CAN_rx_frame.data.u8[0] == 0xFF && CAN_rx_frame.data.u8[1] == 0x01) // Play the hint tone before throwing the shuttlecock
                 {
-                    CANLogFile.printf("%02u:%02u:%02u,%u,%u,%u,%u,", hour(), minute(), second(), millis(), packNum, CAN_rx_frame.MsgID, CAN_rx_frame.FIR.B.DLC);
-                    for (uint8_t i = 0; i < CAN_rx_frame.FIR.B.DLC; i++) CANLogFile.printf("0x%02x,", CAN_rx_frame.data.u8[i]);
-                    for (uint8_t i = 0; i < 8 - CAN_rx_frame.FIR.B.DLC; i++) CANLogFile.printf(",");
-                    CANLogFile.printf("\r\n");
+                    Log("Ready to throw the shuttlecock\r\n");
+                    AddToPlaylist(2);
+                    AddToPlaylist(19);
                 }
-                CANLogFile.close();
+                break;
             }
+        }
+        if (TFTTaskHandle) xTaskNotifyGive(TFTTaskHandle); //xTaskNotify(TFTTaskHandle, 1, eSetValueWithOverwrite); 
+        if (CANLogFile) // Save log file to SD Card
+        {
+            CANLogFile.printf("%02u:%02u:%02u,%u,%u,0x%X,%d,", hour(), minute(), second(), millis(), packNum, CAN_rx_frame.MsgID, CAN_rx_frame.FIR.B.DLC);
+            for (uint8_t i = 0; i < CAN_rx_frame.FIR.B.DLC; i++) CANLogFile.printf("0x%02X,", CAN_rx_frame.data.u8[i]);
+            for (uint8_t i = 0; i < 8 - CAN_rx_frame.FIR.B.DLC; i++) CANLogFile.printf(",");
+            CANLogFile.printf("\r\n");
+        }
+        if (ENABLE_CAN_DEBUG)
+        {
             Serial.println("-------------------------");
             Serial.printf("Pack Number: %u\r\n", packNum);
             Serial.print("Type: ");
@@ -1001,12 +1104,12 @@ void CANRecvTask(void * pvParameters)
             Serial.print("RTR: ");
             if (CAN_rx_frame.FIR.B.RTR == CAN_RTR) Serial.println("True");
             else Serial.println("False");
-            Serial.printf("Msg ID: 0x%08x\r\n", CAN_rx_frame.MsgID);
+            Serial.printf("Msg ID: 0x%X\r\n", CAN_rx_frame.MsgID);
             Serial.printf("DLC: %d\r\n", CAN_rx_frame.FIR.B.DLC);
-            Serial.print("Data: ");
+            Serial.print("Data:");
             for (uint8_t i = 0; i < CAN_rx_frame.FIR.B.DLC; i++)
             {
-                Serial.printf("%02x ", CAN_rx_frame.data.u8[i]);
+                Serial.printf(" %02X", CAN_rx_frame.data.u8[i]);
             }
             Serial.println();
             Serial.println("-------------------------");
@@ -1024,15 +1127,8 @@ void UARTRecvTask(void * pvParameters)
         {
             tmp = Serial1.read();
             xQueueSend(SerialFIFO, &tmp, 0); // Insert item into the queue
-            if (isSDCardInserted) // Save log file to SD Card
-            {
-                File UARTLogFile = SD.open("/" + String(BootTimePrefix) + "UART.csv", FILE_APPEND);
-                if (UARTLogFile)
-                {
-                    UARTLogFile.printf("%02u:%02u:%02u,%u,%s,0x%02x,%c,\r\n", hour(), minute(), second(), millis(), tmp, tmp);
-                }
-                UARTLogFile.close();
-            }
+            if (UARTLogFile) UARTLogFile.printf("%02u:%02u:%02u,%u,0x%02X,%c,\r\n", hour(), minute(), second(), millis(), tmp, tmp); // Save log file to SD Card
+            if (UARTTextFile) UARTTextFile.print(tmp); // Save text file to SD Card
         }
     }
     vTaskDelete(NULL);
@@ -1042,10 +1138,8 @@ void TestTask(void * pvParameters)
 {
     while (1)
     {
-        Log("[%u] System is running", millis());
-        //Log(NTP.getTimeDateString().c_str());
         Serial1.printf("STM32 UART Test!\r\n");
-        delay(5000);
+        delay(2500);
     }
     vTaskDelete(NULL);
 }
@@ -1183,17 +1277,11 @@ void Log(const char * format, ...) // Customized printf based logging function
         LogPtr = 0;
     }
     LogHistory[LogPtr++] = String(buf);
-    if (TFTTaskHandle) xTaskNotify(TFTTaskHandle, 1, eSetValueWithOverwrite); // xTaskNotifyGive(TFTTaskHandle);
-    if (isSDCardInserted) // Save log file to SD Card
+    if (externalLogFile) // Save log file to SD Card
     {
-        File externalLogFile = SD.open("/" + String(BootTimePrefix) + "Syslog.csv", FILE_APPEND);
-        if (externalLogFile)
-        {
-            externalLogFile.printf("%02u:%02u:%02u,%u,", hour(), minute(), second(), millis());
-            externalLogFile.printf(buf);
-            externalLogFile.printf(",\r\n");
-        }
-        externalLogFile.close();
+        externalLogFile.printf("%02u:%02u:%02u,%u,", hour(), minute(), second(), millis());
+        externalLogFile.printf(buf);
+        externalLogFile.printf(",\r\n");
     }
     va_end(vargs);
 }

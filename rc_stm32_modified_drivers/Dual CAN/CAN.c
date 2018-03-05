@@ -10,7 +10,7 @@ CanRxMsg CAN1RxMessage;
 CanTxMsg CAN2TxMessage;
 CanRxMsg CAN2RxMessage;
 
-void CAN_Init()
+void Dual_CAN_Init()
 {
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB, ENABLE);                   // GPIO时钟初始化
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_CAN1 | RCC_APB1Periph_CAN2, ENABLE);                     // CAN外设时钟初始化
