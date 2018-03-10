@@ -31,7 +31,7 @@ const char* PASSWORD = "2018_RC_UESTC";
 IPAddress    GATEWAY = (192, 168, 39, 1);
 uint16_t        PORT = 2333;
 
-#define BUZZER_PIN GPIO_NUM_22
+#define BUZZER_PIN GPIO_NUM_32
 #define CAN_TX_PIN GPIO_NUM_4
 #define CAN_RX_PIN GPIO_NUM_5
 #define CAN_FILTER_LOWER 0x20
@@ -284,7 +284,7 @@ void BeepTask(void * pvParameters)
         uint32_t BigPeriod = SmallPeriod * BeepCfg.Repeat + BeepCfg.Freeze;
         if (SmallPeriod && BigPeriod &&
             (millis() - TS) % BigPeriod < BigPeriod - BeepCfg.Freeze &&
-            (millis() - TS) % BigPeriod % SmallPeriod < BeepCfg.On) digitalWrite(BUZZER_PIN, HIGH);
+            (millis() - TS) % BigPeriod % SmallPeriod < BeepCfg.On); //digitalWrite(BUZZER_PIN, HIGH);
         else digitalWrite(BUZZER_PIN, LOW);
     }
 }
