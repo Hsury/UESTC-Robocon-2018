@@ -8,6 +8,23 @@
 #define COEF_LINEAR  (2.5f)
 #define COEF_ANGULAR (2.5f)
 
-uint32_t UniformPlusP(float GoalX, float GoalY, float GoalZ, uint32_t BlockTime);
+extern PID_t PIDX;
+extern PID_t PIDY;
+extern PID_t PIDZ;
+
+extern float PIDOutX;
+extern float PIDOutY;
+extern float PIDOutZ;
+
+void Move_PID_Init(void);
+void Move_PID_Start(void);
+void Move_PID_Stop(void);
+void Move_PID_Compute(void);
+void Move_PID_Apply(void);
+void Move_PID_SetTunings(float KpX, float KiX, float KdX, 
+                         float KpY, float KiY, float KdY, 
+                         float KpZ, float KiZ, float KdZ);
+void Move_PID_SetLimits(float MaxX, float MaxY, float MaxZ);
+float CubicBezier(float P0, float P1, float P2, float P3, float T);
 
 #endif

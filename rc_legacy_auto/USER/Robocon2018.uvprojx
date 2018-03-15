@@ -430,6 +430,11 @@
               <FileType>1</FileType>
               <FilePath>..\APP\Move.c</FilePath>
             </File>
+            <File>
+              <FileName>Tasks.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\APP\Tasks.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -454,6 +459,21 @@
               <FileName>RGBLED.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\RGBLED.c</FilePath>
+            </File>
+            <File>
+              <FileName>Probe.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\Probe.c</FilePath>
+            </File>
+            <File>
+              <FileName>GY53.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\GY53.c</FilePath>
+            </File>
+            <File>
+              <FileName>Cylinder.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\Cylinder.c</FilePath>
             </File>
           </Files>
         </Group>

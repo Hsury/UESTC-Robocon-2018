@@ -14,34 +14,34 @@
 
 typedef struct
 {
-    double dispKp;                  // * we'll hold on to the tuning parameters in user-entered 
-    double dispKi;                  //   format for display purposes
-    double dispKd;
+    float dispKp;                  // * we'll hold on to the tuning parameters in user-entered 
+    float dispKi;                  //   format for display purposes
+    float dispKd;
     
-    double kp;                      // * (P)roportional Tuning Parameter
-    double ki;                      // * (I)ntegral Tuning Parameter
-    double kd;                      // * (D)erivative Tuning Parameter
+    float kp;                      // * (P)roportional Tuning Parameter
+    float ki;                      // * (I)ntegral Tuning Parameter
+    float kd;                      // * (D)erivative Tuning Parameter
     
     int controllerDirection;
     int pOn;
     
-    double *myInput;                // * Pointers to the Input, Output, and Setpoint variables
-    double *myOutput;               //   This creates a hard link between the variables and the 
-    double *mySetpoint;             //   PID, freeing the user from having to constantly tell us
+    float *myInput;                // * Pointers to the Input, Output, and Setpoint variables
+    float *myOutput;               //   This creates a hard link between the variables and the 
+    float *mySetpoint;             //   PID, freeing the user from having to constantly tell us
                                     //   what these values are.  with pointers we'll just know.
     
     unsigned long lastTime;
-    double outputSum, lastInput;
+    float outputSum, lastInput;
     
     unsigned long SampleTime;
-    double outMin, outMax;
+    float outMin, outMax;
     bool inAuto, pOnE;
 }
 PID_t;
 
 //commonly used functions **************************************************************************
-PID_t PID(double* Input, double* Output, double* Setpoint, double Kp,  // * constructor.  links the PID to the Input, Output, and
-          double Ki, double Kd, int POn, int ControllerDirection);     //   Setpoint.  Initial tuning parameters are also set here.
+PID_t PID(float* Input, float* Output, float* Setpoint, float Kp,  // * constructor.  links the PID to the Input, Output, and
+          float Ki, float Kd, int POn, int ControllerDirection);     //   Setpoint.  Initial tuning parameters are also set here.
                                                                        //   (overload for specifying proportional mode)
 
 void PID_SetMode(PID_t* PIDStruct, int Mode);                          // * sets PID to either Manual (0) or Auto (non-0)
@@ -51,12 +51,12 @@ bool PID_Compute(PID_t* PIDStruct);                                    // * perf
                                                                        //   calculation frequency can be set using SetMode
                                                                        //   SetSampleTime respectively
 
-void PID_SetOutputLimits(PID_t* PIDStruct, double Min, double Max);    // * clamps the output to a specific range. 0-255 by default, but
+void PID_SetOutputLimits(PID_t* PIDStruct, float Min, float Max);    // * clamps the output to a specific range. 0-255 by default, but
                                                                        //   it's likely the user will want to change this depending on
                                                                        //   the application
 
 //available but not commonly used functions ********************************************************
-void PID_SetTunings(PID_t* PIDStruct, double Kp, double Ki, double Kd, // * While most users will set the tunings once in the
+void PID_SetTunings(PID_t* PIDStruct, float Kp, float Ki, float Kd, // * While most users will set the tunings once in the
                     int POn);                                          //   constructor, this function gives the user the option
                                                                        //   of changing tunings during runtime for Adaptive control
 
@@ -69,9 +69,9 @@ void PID_SetSampleTime(PID_t* PIDStruct, int NewSampleTime);           // * sets
                                                                        //   the PID calculation is performed.  default is 100
 
 //Display functions ****************************************************************
-double PID_GetKp(PID_t* PIDStruct);                                    //   These functions query the pid for interal values.
-double PID_GetKi(PID_t* PIDStruct);                                    //   they were created mainly for the pid front-end,
-double PID_GetKd(PID_t* PIDStruct);                                    //   where it's important to know what is actually 
+float PID_GetKp(PID_t* PIDStruct);                                    //   These functions query the pid for interal values.
+float PID_GetKi(PID_t* PIDStruct);                                    //   they were created mainly for the pid front-end,
+float PID_GetKd(PID_t* PIDStruct);                                    //   where it's important to know what is actually 
 int PID_GetMode(PID_t* PIDStruct);                                     //   inside the PID.
 int PID_GetDirection(PID_t* PIDStruct);
 

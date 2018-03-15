@@ -1,7 +1,5 @@
 #include "CAN.h"
 
-extern TaskHandle_t MoveTask_Handler;
-
 GPIO_InitTypeDef       GPIO_InitStructure; 
 CAN_InitTypeDef        CAN_InitStructure;
 CAN_FilterInitTypeDef  CAN_FilterInitStructure;
@@ -118,49 +116,64 @@ void CAN2_RX0_IRQHandler()
     CAN_Receive(CAN2, CAN_FIFO0, &RxMessage);
     switch (RxMessage.StdId)
     {
-        case GE_POS_CAN_ID:;
-        int32_t STmp;
-        float PosXTmp, PosYTmp, RealVelXTmp, RealVelYTmp;
-        DeltaTS = TS - EncoderTS;
-        memcpy(&STmp, &RxMessage.Data[0], 4);
-        PosXTmp = Encoder2Real_X(STmp);
-        RealVelXTmp = (PosXTmp - PosX) / DeltaTS * 1000;
-        RealAccX = (RealVelXTmp - RealVelX) / DeltaTS * 1000;
-        RealVelX = RealVelXTmp;
-        PosX = PosXTmp;
-        memcpy(&STmp, &RxMessage.Data[4], 4);
-        PosYTmp = Encoder2Real_Y(STmp);
-        RealVelYTmp = (PosYTmp - PosY) / DeltaTS * 1000;
-        RealAccY = (RealVelYTmp - RealVelY) / DeltaTS * 1000;
-        RealVelY = RealVelYTmp;
-        PosY = PosYTmp;
-        EncoderTS = TS;
+        case GE_POS_CAN_ID:
+        if (GESwitch)
+        {
+            int32_t STmp;
+            float PosXTmp, PosYTmp, RealVelXTmp, RealVelYTmp;
+            DeltaTS = TS - EncoderTS;
+            memcpy(&STmp, &RxMessage.Data[0], 4);
+            PosXTmp = Encoder2RealX(STmp);
+            RealVelXTmp = (PosXTmp - PosX) / DeltaTS * 1000;
+            RealAccX = (RealVelXTmp - RealVelX) / DeltaTS * 1000;
+            RealVelX = RealVelXTmp;
+            PosX = PosXTmp;
+            memcpy(&STmp, &RxMessage.Data[4], 4);
+            PosYTmp = Encoder2RealY(STmp);
+            RealVelYTmp = (PosYTmp - PosY) / DeltaTS * 1000;
+            RealAccY = (RealVelYTmp - RealVelY) / DeltaTS * 1000;
+            RealVelY = RealVelYTmp;
+            PosY = PosYTmp;
+            EncoderTS = TS;
+        }
         Online |= (1 << 3);
         break;
         
-        case GE_ANG_CAN_ID:;
-        float FTmp;
-        float AngZTmp, RealVelZTmp;
-        DeltaTS = TS - GyroTS;
-        memcpy(&FTmp, &RxMessage.Data[0], 4);
-        AngZTmp = Gyro2Real_Z(FTmp);
-        RealVelZTmp = (DeltaAng(AngZTmp - AngZ)) / DeltaTS * 1000;
-        RealAccZ = (RealVelZTmp - RealVelZ) / DeltaTS * 1000;
-        RealVelZ = RealVelZTmp;
-        AngZ = AngZTmp;
-        GyroTS = TS;
+        case GE_ANG_CAN_ID:
+        if (GESwitch)
+        {
+            float FTmp;
+            float PosZTmp, RealVelZTmp;
+            DeltaTS = TS - GyroTS;
+            memcpy(&FTmp, &RxMessage.Data[0], 4);
+            PosZTmp = Gyro2RealZ(FTmp);
+            RealVelZTmp = (DeltaAng(PosZTmp - PosZ)) / DeltaTS * 1000;
+            RealAccZ = (RealVelZTmp - RealVelZ) / DeltaTS * 1000;
+            RealVelZ = RealVelZTmp;
+            PosZ = PosZTmp;
+            GyroTS = TS;
+        }
         Online |= (1 << 3);
         break;
         
-        case KEYBOARD_CAN_ID:
+        case KEYBOARD_CAN_ID:;
+        BaseType_t pxHigherPriorityTaskWoken;
         switch (RxMessage.Data[0])
         {
-            case 0x05:; // 发车
-            BaseType_t pxHigherPriorityTaskWoken;
-            vTaskNotifyGiveFromISR(MoveTask_Handler, &pxHigherPriorityTaskWoken);
-            if (pxHigherPriorityTaskWoken != pdFALSE) taskYIELD();
+            case 0x05: // SZ => TZ1
+            //vTaskNotifyGiveFromISR(MoveTask_Handler, &pxHigherPriorityTaskWoken);
+            xTaskNotifyFromISR(MoveTask_Handler, 1, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            break;
+            
+            case 0x06: // TZ1 => TZ2
+            xTaskNotifyFromISR(MoveTask_Handler, 2, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            break;
+            
+            case 0x07: // TZ2 => TZ3
+            xTaskNotifyFromISR(MoveTask_Handler, 3, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
             break;
         }
+        if (pxHigherPriorityTaskWoken != pdFALSE) taskYIELD();
         break;
     }
     // 在这里添加CAN2中断服务函数

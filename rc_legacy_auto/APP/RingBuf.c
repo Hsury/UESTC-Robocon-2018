@@ -19,17 +19,17 @@
 
 #include "RingBuf.h"
 
-// ע�⣺��ʵ����Ϊ�����ֻ��λ�����Ϊ�ջ���Ϊ��������ʧһ��Ԫ�صĴ洢�ռ䡣�����λ��С����1Byte�������ڴ�Խ����ɿ���ʹ�ñ�־λ������
+// 注意：本实现中为了区分环形缓冲区为空还是为满，将损失一个元素的存储空间。如果单位大小超过1Byte，并且内存吃紧，可考虑使用标志位来区分
 
 /**
-  * @brief  ����һ�����λ�������FIFO��
-  * @param  QSize: �ɴ��Ԫ�ص�����
-            ESize: ����Ԫ��ռ�õ��ֽ���
-  * @retval һ��RingBuf_t�ṹ��
+  * @brief  创建一个环形缓冲区（FIFO）
+  * @param  QSize: 可存放元素的数量
+            ESize: 单个元素占用的字节数
+  * @retval 一个RingBuf_t结构体
   */
 RingBuf_t RingBuf_Create(uint16_t QSize, uint16_t ESize)
 {
-    //QSize++; // �����Ի��ʵ�ʿ��ô�С��ͬ�ڴ������QSize�Ļ��λ�����
+    //QSize++; // 加上以获得实际可用大小等同于传入参数QSize的环形缓冲区
     uint8_t Data[QSize][ESize];
     memset(Data, 0, QSize * ESize);
     RingBuf_t RingBuf;
@@ -42,9 +42,9 @@ RingBuf_t RingBuf_Create(uint16_t QSize, uint16_t ESize)
 }
 
 /**
-  * @brief  ��������λ��һ�����λ�����
-  * @param  Q: RingBuf_t�ṹ��
-  * @retval ��
+  * @brief  擦除（复位）一个环形缓冲区
+  * @param  Q: RingBuf_t结构体
+  * @retval 无
   */
 void RingBuf_Wipe(RingBuf_t* Q)
 {
@@ -54,9 +54,9 @@ void RingBuf_Wipe(RingBuf_t* Q)
 }
 
 /**
-  * @brief  ���ػ��λ�������ռ����
-  * @param  Q: RingBuf_t�ṹ��
-  * @retval ���������Ѵ�ŵ�Ԫ������
+  * @brief  返回环形缓冲区的占用量
+  * @param  Q: RingBuf_t结构体
+  * @retval 缓冲区中已存放的元素数量
   */
 uint16_t RingBuf_Usage(RingBuf_t* Q)
 {
@@ -64,9 +64,9 @@ uint16_t RingBuf_Usage(RingBuf_t* Q)
 }
 
 /**
-  * @brief  ���ػ��λ������Ŀ�����
-  * @param  Q: RingBuf_t�ṹ��
-  * @retval �������л��ɴ����Ԫ������
+  * @brief  返回环形缓冲区的空余量
+  * @param  Q: RingBuf_t结构体
+  * @retval 缓冲区中还可存入的元素数量
   */
 uint16_t RingBuf_Available(RingBuf_t* Q)
 {
@@ -74,10 +74,10 @@ uint16_t RingBuf_Available(RingBuf_t* Q)
 }
 
 /**
-  * @brief  ���ػ��λ������Ƿ�Ϊ��
-  * @param  Q: RingBuf_t�ṹ��
-  * @retval 0: ��Ϊ��
-            1: Ϊ��
+  * @brief  返回环形缓冲区是否为空
+  * @param  Q: RingBuf_t结构体
+  * @retval 0: 不为空
+            1: 为空
   */
 uint8_t RingBuf_isEmpty(RingBuf_t* Q)
 {
@@ -86,10 +86,10 @@ uint8_t RingBuf_isEmpty(RingBuf_t* Q)
 }
 
 /**
-  * @brief  ���ػ��λ������Ƿ�Ϊ��
-  * @param  Q: RingBuf_t�ṹ��
-  * @retval 0: ��Ϊ��
-            1: Ϊ��
+  * @brief  返回环形缓冲区是否为满
+  * @param  Q: RingBuf_t结构体
+  * @retval 0: 不为满
+            1: 为满
   */
 uint8_t RingBuf_isFull(RingBuf_t* Q)
 {
@@ -98,11 +98,11 @@ uint8_t RingBuf_isFull(RingBuf_t* Q)
 }
 
 /**
-  * @brief  ���������δ�����������з���Ԫ��
-  * @param  Q: RingBuf_t�ṹ��
-            Data: Ҫ������ֽ��������ʼ��ַ
-  * @retval 0: ����������������ʧ��
-            1: ���óɹ�
+  * @brief  如果缓冲区未满，则往其中放入元素
+  * @param  Q: RingBuf_t结构体
+            Data: 要存入的字节数组的起始地址
+  * @retval 0: 缓冲区已满，放置失败
+            1: 放置成功
   */
 uint8_t RingBuf_Put(RingBuf_t* Q, uint8_t* Data)
 {
@@ -116,10 +116,10 @@ uint8_t RingBuf_Put(RingBuf_t* Q, uint8_t* Data)
 }
 
 /**
-  * @brief  ǿ�����������з���Ԫ�أ��������򸲸�������Ǹ�Ԫ��
-  * @param  Q: RingBuf_t�ṹ��
-            Data: Ҫ������ֽ��������ʼ��ַ
-  * @retval ��
+  * @brief  强制往缓冲区中放入元素，若已满则覆盖最早的那个元素
+  * @param  Q: RingBuf_t结构体
+            Data: 要存入的字节数组的起始地址
+  * @retval 无
   */
 void RingBuf_Overwrite(RingBuf_t* Q, uint8_t* Data)
 {
@@ -128,11 +128,11 @@ void RingBuf_Overwrite(RingBuf_t* Q, uint8_t* Data)
 }
 
 /**
-  * @brief  ���Դӻ�����ȡ��Ԫ��
-  * @param  Q: RingBuf_t�ṹ��
-            Data: ���ڴ��ȡ��Ԫ�ص��ֽ��������ʼ��ַ
-  * @retval 0: ������Ϊ�գ�ȡ��ʧ��
-            1: ȡ�سɹ�
+  * @brief  尝试从缓冲区取出元素
+  * @param  Q: RingBuf_t结构体
+            Data: 用于存放取出元素的字节数组的起始地址
+  * @retval 0: 缓冲区为空，取回失败
+            1: 取回成功
   */
 uint8_t RingBuf_Get(RingBuf_t* Q, uint8_t* Data)
 {
@@ -146,18 +146,18 @@ uint8_t RingBuf_Get(RingBuf_t* Q, uint8_t* Data)
 }
 
 /**
-  * @brief  ����������ָ��λ�õ�Ԫ��
-  * @param  Q: RingBuf_t�ṹ��
-            Index: Ҫ��Ԫ�ص������ţ�0Ϊ��ɣ�(QSize - 1)Ϊ����
-            Data: ���ڴ��ȡ��Ԫ�ص��ֽ��������ʼ��ַ
-  * @retval ��
+  * @brief  读缓冲区的指定位置的元素
+  * @param  Q: RingBuf_t结构体
+            Index: 要读元素的索引号，0为最旧，(QSize - 1)为最新
+            Data: 用于存放取出元素的字节数组的起始地址
+  * @retval 无
   */
 void RingBuf_Peek(RingBuf_t* Q, uint16_t Index, uint8_t* Data)
 {
     memcpy(Data, &Q->Data[(Q->Rear + Index) % Q->QSize], Q->ESize);
 }
 
-// ���������ģʽ���ò�ͬ������
+// 解决半主机模式设置不同步问题
 void _ttywrch(int ch)
 {
     ch = ch;

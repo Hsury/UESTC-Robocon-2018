@@ -4,15 +4,15 @@
  *    The parameters specified here are those for for which we can't set up
  *    reliable defaults, so we need to have the user set them.
  ***************************************************************************/
-PID_t PID(double* Input, double* Output, double* Setpoint, double Kp, double Ki, double Kd, int POn, int ControllerDirection)
+PID_t PID(float* Input, float* Output, float* Setpoint, float Kp, float Ki, float Kd, int POn, int ControllerDirection)
 {
     PID_t PIDInstance;
     PIDInstance.myOutput = Output;
     PIDInstance.myInput = Input;
     PIDInstance.mySetpoint = Setpoint;
     PIDInstance.inAuto = false;
-    PID_SetOutputLimits(&PIDInstance, 0, 255);                        //default output limit corresponds to the arduino pwm limits
-    PIDInstance.SampleTime = 100;                                     //default Controller Sample Time is 0.1 seconds
+    PID_SetOutputLimits(&PIDInstance, -3, 3);                         //default output limit corresponds to the robot limits
+    PIDInstance.SampleTime = 5;                                       //default Controller Sample Time is 0.005 seconds
     PID_SetControllerDirection(&PIDInstance, ControllerDirection);
     PID_SetTunings(&PIDInstance, Kp, Ki, Kd, POn);
     PIDInstance.lastTime = millis() - PIDInstance.SampleTime;
@@ -33,16 +33,16 @@ bool PID_Compute(PID_t* PIDStruct)
     if (timeChange >= PIDStruct->SampleTime)
     {
         /*Compute all the working error variables*/
-        double input = *PIDStruct->myInput;
-        double error = *PIDStruct->mySetpoint - input;
-        double dInput = (input - PIDStruct->lastInput);
+        float input = *PIDStruct->myInput;
+        float error = *PIDStruct->mySetpoint - input;
+        float dInput = (input - PIDStruct->lastInput);
         PIDStruct->outputSum += (PIDStruct->ki * error);
         /*Add Proportional on Measurement, if P_ON_M is specified*/
         if (!PIDStruct->pOnE) PIDStruct->outputSum -= PIDStruct->kp * dInput;
         if (PIDStruct->outputSum > PIDStruct->outMax) PIDStruct->outputSum = PIDStruct->outMax;
         else if (PIDStruct->outputSum < PIDStruct->outMin) PIDStruct->outputSum = PIDStruct->outMin;
         /*Add Proportional on Error, if P_ON_E is specified*/
-        double output;
+        float output;
         if (PIDStruct->pOnE) output = PIDStruct->kp * error;
         else output = 0;
         /*Compute Rest of PID Output*/
@@ -63,7 +63,7 @@ bool PID_Compute(PID_t* PIDStruct)
  * it's called automatically from the constructor, but tunings can also
  * be adjusted on the fly during normal operation
  ******************************************************************************/
-void PID_SetTunings(PID_t* PIDStruct, double Kp, double Ki, double Kd, int POn)
+void PID_SetTunings(PID_t* PIDStruct, float Kp, float Ki, float Kd, int POn)
 {
     if (Kp < 0 || Ki < 0 || Kd < 0) return;
     PIDStruct->pOn = POn;
@@ -71,7 +71,7 @@ void PID_SetTunings(PID_t* PIDStruct, double Kp, double Ki, double Kd, int POn)
     PIDStruct->dispKp = Kp;
     PIDStruct->dispKi = Ki;
     PIDStruct->dispKd = Kd;
-    double SampleTimeInSec = ((double)PIDStruct->SampleTime) / 1000;
+    float SampleTimeInSec = ((float)PIDStruct->SampleTime) / 1000;
     PIDStruct->kp = Kp;
     PIDStruct->ki = Ki * SampleTimeInSec;
     PIDStruct->kd = Kd / SampleTimeInSec;
@@ -90,7 +90,7 @@ void PID_SetSampleTime(PID_t* PIDStruct, int NewSampleTime)
 {
     if (NewSampleTime > 0)
     {
-        double ratio  = (double)NewSampleTime / (double)PIDStruct->SampleTime;
+        float ratio  = (float)NewSampleTime / (float)PIDStruct->SampleTime;
         PIDStruct->ki *= ratio;
         PIDStruct->kd /= ratio;
         PIDStruct->SampleTime = (unsigned long)NewSampleTime;
@@ -105,7 +105,7 @@ void PID_SetSampleTime(PID_t* PIDStruct, int NewSampleTime)
  *  want to clamp it from 0-125.  who knows.  at any rate, that can all be done
  *  here.
  **************************************************************************/
-void PID_SetOutputLimits(PID_t* PIDStruct, double Min, double Max)
+void PID_SetOutputLimits(PID_t* PIDStruct, float Min, float Max)
 {
     if (Min >= Max) return;
     PIDStruct->outMin = Min;
@@ -169,8 +169,8 @@ void PID_SetControllerDirection(PID_t* PIDStruct, int Direction)
  * functions query the internal state of the PID.  they're here for display
  * purposes.  this are the functions the PID Front-end uses for example
  ******************************************************************************/
-double PID_GetKp(PID_t* PIDStruct) {return PIDStruct->dispKp;}
-double PID_GetKi(PID_t* PIDStruct) {return PIDStruct->dispKi;}
-double PID_GetKd(PID_t* PIDStruct) {return PIDStruct->dispKd;}
+float PID_GetKp(PID_t* PIDStruct) {return PIDStruct->dispKp;}
+float PID_GetKi(PID_t* PIDStruct) {return PIDStruct->dispKi;}
+float PID_GetKd(PID_t* PIDStruct) {return PIDStruct->dispKd;}
 int PID_GetMode(PID_t* PIDStruct) {return PIDStruct->inAuto ? PID_AUTOMATIC : PID_MANUAL;}
 int PID_GetDirection(PID_t* PIDStruct) {return PIDStruct->controllerDirection;}

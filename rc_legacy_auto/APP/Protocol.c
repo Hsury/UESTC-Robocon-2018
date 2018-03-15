@@ -1,7 +1,5 @@
 #include "Protocol.h"
 
-extern TaskHandle_t MoveTask_Handler;
-
 uint8_t Checkout(RingBuf_t* Q)
 {
     uint8_t HeadByte, SeperatorByte, TailByte;
@@ -20,35 +18,29 @@ uint8_t Checkout(RingBuf_t* Q)
         Data;
         RingBuf_Peek(Q, 1, &Addr);
         for (uint8_t i = 0; i < 4; i++) RingBuf_Peek(Q, 3 + i, &Data.B[i]);
-        PackUp(0xFF, Data.B); // »ØÉù
+        PackUp(0xFF, Data.B); // å›žå£°
         switch (Addr)
         {
-            case 0x00: // È«¾Ö¼¶±ð
+            case 0x00: // å…¨å±€çº§åˆ«
             switch (Data.U)
             {
-                case 0x00000000:; // ±¨¸æÍâÉèÉÏÏß×´Ì¬
+                case 0x00000000:; // æŠ¥å‘Šå¤–è®¾ä¸Šçº¿çŠ¶æ€
                 PackUp(0x00, (uint8_t*)(&Online));
                 break;
                 
-                case 0x00000001: // ³õÊ¼»¯ËùÓÐÍâÉè
+                case 0x00000001: // åˆå§‹åŒ–æ‰€æœ‰å¤–è®¾
                 Online = 0x0000;
                 Elmo_Init(CAN1, 9, 0);
                 GyroEncoder_Reset();
-                VelX = 0;
-                VelY = 0;
-                VelZ = 0;
-                PosX = 0;
-                PosY = 0;
-                AngZ = 0;
                 break;
                 
-                case 0x00000002:; // ¿ªÊ¼Ö´ÐÐµ×ÅÌÔË¶¯ÈÎÎñ
+                case 0x00000002:; // å¼€å§‹æ‰§è¡Œåº•ç›˜è¿åŠ¨ä»»åŠ¡
                 BaseType_t pxHigherPriorityTaskWoken;
                 vTaskNotifyGiveFromISR(MoveTask_Handler, &pxHigherPriorityTaskWoken);
                 if (pxHigherPriorityTaskWoken != pdFALSE) taskYIELD();
                 break;
                 
-                case 0xFFFFFFFF: // ¸´Î»Ö÷¿Ø
+                case 0xFFFFFFFF: // å¤ä½ä¸»æŽ§
                 Elmo_Close(0);
                 delay_xms(100);
                 NVIC_SystemReset();
@@ -56,74 +48,62 @@ uint8_t Checkout(RingBuf_t* Q)
             }
             break;
             
-            case 0x10: // µ×ÅÌ×Ü¿Ø¼¶±ð
+            case 0x10: // åº•ç›˜æ€»æŽ§çº§åˆ«
             switch (Data.U)
             {
-                case 0x00000000: // ÊÍ·Åµ×ÅÌËùÓÐµç»ú
+                case 0x00000000: // é‡Šæ”¾åº•ç›˜æ‰€æœ‰ç”µæœº
                 Omni_Elmo_Close();
-                VelX = 0;
-                VelY = 0;
-                VelZ = 0;
                 break;
                 
-                case 0x00000001: // ±§ËÀµ×ÅÌËùÓÐµç»ú
+                case 0x00000001: // æŠ±æ­»åº•ç›˜æ‰€æœ‰ç”µæœº
                 Omni_Elmo_Stop();
-                VelX = 0;
-                VelY = 0;
-                VelZ = 0;
                 break;
                 
-                case 0x00000002: // µ×ÅÌÔË¶¯ÉúÐ§
+                case 0x00000002: // åº•ç›˜è¿åŠ¨ç”Ÿæ•ˆ
                 Omni_Elmo_PVM();
                 break;
             }
             break;
             
-            case 0x11: // Ô¤ÉèÖÃµ×ÅÌXÖáÔË¶¯ËÙ¶È
+            case 0x11: // é¢„è®¾ç½®åº•ç›˜Xè½´è¿åŠ¨é€Ÿåº¦
             VelX = Data.F;
             break;
             
-            case 0x12: // Ô¤ÉèÖÃµ×ÅÌYÖáÔË¶¯ËÙ¶È
+            case 0x12: // é¢„è®¾ç½®åº•ç›˜Yè½´è¿åŠ¨é€Ÿåº¦
             VelY = Data.F;
             break;
             
-            case 0x13: // Ô¤ÉèÖÃµ×ÅÌZÖáÔË¶¯ËÙ¶È
+            case 0x13: // é¢„è®¾ç½®åº•ç›˜Zè½´è¿åŠ¨é€Ÿåº¦
             VelZ = Data.F;
             break;
             
-            case 0x20: // ÍÓÂÝÒÇÓëÂëÅÌ×Ü¿Ø¼¶±ð
+            case 0x20: // é™€èžºä»ªä¸Žç ç›˜æ€»æŽ§çº§åˆ«
             switch (Data.U)
             {
-                case 0x00000000: // ÍÓÂÝÒÇÓëÂëÅÌ³õÊ¼»¯
+                case 0x00000000: // é™€èžºä»ªä¸Žç ç›˜åˆå§‹åŒ–
                 GyroEncoder_Reset();
-                PosX = 0;
-                PosY = 0;
-                AngZ = 0;
-                PackUp(0xFF, Data.B); // ³õÊ¼»¯Íê³ÉÌáÊ¾
+                PackUp(0xFF, Data.B); // åˆå§‹åŒ–å®Œæˆæç¤º
                 break;
                 
-                case 0x00000001: // ÍÓÂÝÒÇÓëÂëÅÌÇåÁã
+                case 0x00000001: // é™€èžºä»ªä¸Žç ç›˜æ¸…é›¶
                 GyroEncoder_Clear();
-                PosX = 0;
-                PosY = 0;
-                AngZ = 0;
-                PackUp(0xFF, Data.B); // ³õÊ¼»¯Íê³ÉÌáÊ¾
+                PackUp(0xFF, Data.B); // åˆå§‹åŒ–å®Œæˆæç¤º
                 break;
             }
             break;
             
-            case 0x21: // ÉèÖÃÂëÅÌXÖá×ø±ê
+            case 0x21: // è®¾ç½®ç ç›˜Xè½´åæ ‡
             PosX = Data.F;
             GyroEncoder_SetPos();
             break;
             
-            case 0x22: // ÉèÖÃÂëÅÌYÖá×ø±ê
+            case 0x22: // è®¾ç½®ç ç›˜Yè½´åæ ‡
             PosY = Data.F;
             GyroEncoder_SetPos();
             break;
             
-            case 0x23: // ÉèÖÃÍÓÂÝÒÇZÖá×ø±ê
-            AngZ = Data.F;
+            case 0x23: // è®¾ç½®é™€èžºä»ªZè½´åæ ‡
+            PosZ = Data.F;
             GyroEncoder_SetAng();
             break;
         }

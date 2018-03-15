@@ -3,37 +3,37 @@
 #include "Includes.h"
 
 /*******************************************************************************
-* ºê¶¨Òå 
+* å®å®šä¹‰ 
 *******************************************************************************/
-/* 0:ÔÚËÙ¶È¿ØÖÆÄ£Ê½ÏÂÆô¶¯ËÙ¶ÈÄ£Ê½,´ËÊ±¼ÓËÙ¶ÈÊ§Ğ§ */ 
-/* 1:ÔÚÎ»ÖÃ¿ØÖÆÄ£Ê½ÏÂÆô¶¯ËÙ¶ÈÄ£Ê½,´ËÊ±¼ÓËÙ¶ÈÉúĞ§ */ 
+/* 0:åœ¨é€Ÿåº¦æ§åˆ¶æ¨¡å¼ä¸‹å¯åŠ¨é€Ÿåº¦æ¨¡å¼,æ­¤æ—¶åŠ é€Ÿåº¦å¤±æ•ˆ */ 
+/* 1:åœ¨ä½ç½®æ§åˆ¶æ¨¡å¼ä¸‹å¯åŠ¨é€Ÿåº¦æ¨¡å¼,æ­¤æ—¶åŠ é€Ÿåº¦ç”Ÿæ•ˆ */ 
 #define  JV_IN_PCM          0
 
 
-/* Ñ­»·¶ÓÁĞ²ÎÊı */
-#define ELMO_NUM            3                               // Elmo¸öÊı,±ØĞëÑÏ¸ñ°´ÕÕ¹ÒÔØ¸öÊıµÄELMOÅäÖÃ£¬²»µÃ¶àÅäÖÃ£¡£¡£¡
-#define CAN_BUF_NUM         150                             //»º³åÖ¸ÁîÌõÊı  ¸Ä³É200ÁË Ô­À´ÊÇ1000  ÓÖ¼õĞ¡µ½ÁË150
-#define CAN_ID_DELAY        0x129                           //ÑÓÊ±Ö¸Áî
+/* å¾ªç¯é˜Ÿåˆ—å‚æ•° */
+#define ELMO_NUM            3                               // Elmoä¸ªæ•°,å¿…é¡»ä¸¥æ ¼æŒ‰ç…§æŒ‚è½½ä¸ªæ•°çš„ELMOé…ç½®ï¼Œä¸å¾—å¤šé…ç½®ï¼ï¼ï¼
+#define CAN_BUF_NUM         150                             //ç¼“å†²æŒ‡ä»¤æ¡æ•°  æ”¹æˆ200äº† åŸæ¥æ˜¯1000  åˆå‡å°åˆ°äº†150
+#define CAN_ID_DELAY        0x129                           //å»¶æ—¶æŒ‡ä»¤
 
-/* ELMOÏà¹Ø²ÎÊı */
-#define RATE_CURRENT        9.210                           // ¶î¶¨µçÁ÷(A)
-#define PEAK_CURRENT        (9.210*2)                       // ·åÖµµçÁ÷(A)
-#define MAX_VOLOCITY        16200                           // µç»ú×î´ó×ªËÙ(rpm)
+/* ELMOç›¸å…³å‚æ•° */
+#define RATE_CURRENT        9.210                           // é¢å®šç”µæµ(A)
+#define PEAK_CURRENT        (9.210*2)                       // å³°å€¼ç”µæµ(A)
+#define MAX_VOLOCITY        16200                           // ç”µæœºæœ€å¤§è½¬é€Ÿ(rpm)
 
-/* ±£»¤»úÖÆÏà¹Ø²ÎÊı */
-#define RATE_CUR            RATE_CURRENT                    // ¶î¶¨µçÁ÷(A)          CL[1]
-#define MAX_CURRENT         PEAK_CURRENT                    // ·åÖµµçÁ÷(A)          PL[1]
-#define MAX_PM_SPEED        (MAX_VOLOCITY*2000/60)          // ×î´óÆ½»¬ËÙ¶È(cnt/s)  VH[2]
-#define MIN_PM_SPEED        (uint32_t)(-MAX_PM_SPEED)            // ×îĞ¡Æ½»¬ËÙ¶È(cnt/s)  VL[2]
-#define MAX_FB_SPEED        ((MAX_VOLOCITY+1000)*2000/60)   // ×î´ó·´À¡ËÙ¶È(cnt/s)  HL[2]
-#define MIN_FB_SPEED        (uint32_t)(-MAX_FB_SPEED)            // ×îĞ¡·´À¡ËÙ¶È(cnt/s)  LL[2]
+/* ä¿æŠ¤æœºåˆ¶ç›¸å…³å‚æ•° */
+#define RATE_CUR            RATE_CURRENT                    // é¢å®šç”µæµ(A)          CL[1]
+#define MAX_CURRENT         PEAK_CURRENT                    // å³°å€¼ç”µæµ(A)          PL[1]
+#define MAX_PM_SPEED        (MAX_VOLOCITY*2000/60)          // æœ€å¤§å¹³æ»‘é€Ÿåº¦(cnt/s)  VH[2]
+#define MIN_PM_SPEED        (uint32_t)(-MAX_PM_SPEED)            // æœ€å°å¹³æ»‘é€Ÿåº¦(cnt/s)  VL[2]
+#define MAX_FB_SPEED        ((MAX_VOLOCITY+1000)*2000/60)   // æœ€å¤§åé¦ˆé€Ÿåº¦(cnt/s)  HL[2]
+#define MIN_FB_SPEED        (uint32_t)(-MAX_FB_SPEED)            // æœ€å°åé¦ˆé€Ÿåº¦(cnt/s)  LL[2]
 
-/* Æ½»¬ÔË¶¯Ïà¹Ø²ÎÊı */ 
-#define PM_ACC              3500000                         // Æ½»¬¼ÓËÙ¶È(cnt/s^2)  AC
-#define PM_DEC              3500000                         // Æ½»¬¼õËÙ¶È(cnt/s^2)  DC
-#define QUICKSTOP_DEC       1000000000                      // ¼±Í£¼õËÙ¶È(cnt/s^2)  SD
-#define POSITION_LIMIT_MAX  1000000000                      // ×î´óÎ»ÖÃ¼«ÏŞ         VH[3] HL[3]
-#define POSITION_LIMIT_MIN  (uint32_t)-1000000000                // ×îĞ¡Î»ÖÃ¼«ÏŞ         VL[3] LL[3]
+/* å¹³æ»‘è¿åŠ¨ç›¸å…³å‚æ•° */ 
+#define PM_ACC              3500000                         // å¹³æ»‘åŠ é€Ÿåº¦(cnt/s^2)  AC
+#define PM_DEC              3500000                         // å¹³æ»‘å‡é€Ÿåº¦(cnt/s^2)  DC
+#define QUICKSTOP_DEC       1000000000                      // æ€¥åœå‡é€Ÿåº¦(cnt/s^2)  SD
+#define POSITION_LIMIT_MAX  1000000000                      // æœ€å¤§ä½ç½®æé™         VH[3] HL[3]
+#define POSITION_LIMIT_MIN  (uint32_t)-1000000000                // æœ€å°ä½ç½®æé™         VL[3] LL[3]
 
 /* CANopen COB identifiers */
 #define COBID_NMT_SERVICE   0x000
@@ -61,12 +61,12 @@
 
 /* Binary Interpreter Command */
 #define UM_IDLE             0x00
-#define UM_TCM              0x01                      // Torque control mode,Á¦¾Ø¿ØÖÆÄ£Ê½
-#define UM_PCM              0x05                      // Position control mode£¬Î»ÖÃ¿ØÖÆÄ£Ê½
-#define UM_UNC              0x06                      // ²»ÄÜÈ·¶¨Ä£Ê½£¬ÊÊÓÃÓÚÈ«²¿µç»úµ÷ÓÃ
+#define UM_TCM              0x01                      // Torque control mode,åŠ›çŸ©æ§åˆ¶æ¨¡å¼
+#define UM_PCM              0x05                      // Position control modeï¼Œä½ç½®æ§åˆ¶æ¨¡å¼
+#define UM_UNC              0x06                      // ä¸èƒ½ç¡®å®šæ¨¡å¼ï¼Œé€‚ç”¨äºå…¨éƒ¨ç”µæœºè°ƒç”¨
 
 #if JV_IN_PCM
-   #define UM_SCM           0x05                      // Position control mode£¬
+   #define UM_SCM           0x05                      // Position control modeï¼Œ
 #else
    #define UM_SCM           0x02                      // Speed control mode
 #endif
@@ -81,11 +81,11 @@
 #define POS_ABS           1
 
 /*****************************************************************************/
-//¸ù¾İÑ¡ÔñµÄµç»úID£¬Îªµç»ú½¨Á¢»º´æ¶ÓÁĞ
+//æ ¹æ®é€‰æ‹©çš„ç”µæœºIDï¼Œä¸ºç”µæœºå»ºç«‹ç¼“å­˜é˜Ÿåˆ—
 /*****************************************************************************/
 
-/*µç»úÑ¡Ôñ*/
-#define ID_0    //±íÊ¾ËùÓĞµÄµç»ú 
+/*ç”µæœºé€‰æ‹©*/
+#define ID_0    //è¡¨ç¤ºæ‰€æœ‰çš„ç”µæœº 
 #define ID_1
 #define ID_2
 #define ID_3
@@ -104,9 +104,9 @@
 
 
 /*******************************************************************************
-* ½á¹¹Ìå
+* ç»“æ„ä½“
 *******************************************************************************/
-/* CANÑ­»·¶ÓÁĞÔªËØ */ 
+/* CANå¾ªç¯é˜Ÿåˆ—å…ƒç´  */ 
 typedef struct __CANDATA 
 {
    uint16_t COBID;               // CANopen COB identifier + NodeID
@@ -114,7 +114,7 @@ typedef struct __CANDATA
    uint8_t  DATA[8];             // Data
 } CANDATA;
 
-/* CANÑ­»·¶ÓÁĞ½á¹¹Ìå */
+/* CANå¾ªç¯é˜Ÿåˆ—ç»“æ„ä½“ */
 typedef struct __CANQUEUE
 {
    uint16_t Front;        
@@ -122,13 +122,13 @@ typedef struct __CANQUEUE
    CANDATA CANBUF[CAN_BUF_NUM];
 } CANQUEUE;
 
-/* Elmo½á¹¹Ìå,¼ÇÂ¼½ÚµãID,×´Ì¬ºÍ¿ØÖÆ²ÎÊı */
+/* Elmoç»“æ„ä½“,è®°å½•èŠ‚ç‚¹ID,çŠ¶æ€å’Œæ§åˆ¶å‚æ•° */
 typedef struct __Elmo
 {
-   uint8_t NodeID;         // elmo½áµãºÅ
-   uint8_t CurOPMode;      // µ±Ç°ÔËĞĞÄ£Ê½ 
+   uint8_t NodeID;         // elmoç»“ç‚¹å·
+   uint8_t CurOPMode;      // å½“å‰è¿è¡Œæ¨¡å¼ 
 }Elmo;
-/*Êı¾İ×ª»¯¹²ÓÃÌå*/
+/*æ•°æ®è½¬åŒ–å…±ç”¨ä½“*/
 typedef union 
 {
     uint32_t uint32_t_form;
@@ -141,13 +141,13 @@ typedef union
 
 
 /*******************************************************************************
-* º¯ÊıÉùÃ÷
+* å‡½æ•°å£°æ˜
 *******************************************************************************/
-/* ELMO³õÊ¼»¯º¯Êı,¶ÔÍâµ÷ÓÃ */
+/* ELMOåˆå§‹åŒ–å‡½æ•°,å¯¹å¤–è°ƒç”¨ */
 extern uint32_t Elmo_Init( CAN_TypeDef* CANx, uint8_t PPr, uint8_t SPr);
 extern void Elmo_Reinit(uint8_t elmoID);
 
-/* ELMO¿ØÖÆº¯Êı£¬¶ÔÍâµ÷ÓÃ */
+/* ELMOæ§åˆ¶å‡½æ•°ï¼Œå¯¹å¤–è°ƒç”¨ */
 extern uint8_t Elmo_PTM(uint8_t elmoID, float torque);
 extern uint8_t Elmo_PVM(uint8_t elmoID, int32_t speed);  
 extern uint8_t Elmo_PPM(uint8_t elmoID, uint32_t speed, int32_t position, uint8_t PPMmode);		//		POS_ABS  POS_REL 
@@ -163,19 +163,19 @@ extern void Omni_Elmo_Stop(void);
 extern void Omni_Elmo_PVM(void);
 
 
-/* CANOpenµÄÊµÏÖº¯Êı,²»¶ÔÍâµ÷ÓÃ */
+/* CANOpençš„å®ç°å‡½æ•°,ä¸å¯¹å¤–è°ƒç”¨ */
 static void NMTCmd(Elmo *elmo, uint8_t MNTCmd);
 static void RSDO(Elmo *elmo, uint16_t Index, uint8_t SubIndex, uint32_t Data);
 static void RPDO2_Cmd_data(Elmo *elmo, uint8_t *Cmd, uint8_t Index, uint8_t Type, uint32_t Data);
 static void RPDO2_Cmd_string(Elmo *elmo, uint8_t *Cmd);
 
-/* Ó²¼ş³õÊ¼»¯º¯Êı,²»¶ÔÍâµ÷ÓÃ */
+/* ç¡¬ä»¶åˆå§‹åŒ–å‡½æ•°,ä¸å¯¹å¤–è°ƒç”¨ */
 //static void CAN_init(CAN_TypeDef* CANx);                    
 static void TIM7_init(uint8_t PPr, uint8_t SPr);
 static int Self_test(void);
 static void Variate_init(void);
 
-/* Êı¾İ·¢ËÍ¡¢×ª»»ÓëÑÓÊ±º¯Êı,²»¶ÔÍâµ÷ÓÃ */
+/* æ•°æ®å‘é€ã€è½¬æ¢ä¸å»¶æ—¶å‡½æ•°,ä¸å¯¹å¤–è°ƒç”¨ */
 static void Elmo_SendCmd(void);
 static void Elmo_CANSend(CANDATA *pCANDATA);
 static void Elmo_Delay100us_IDx( Elmo *elmo , uint8_t N100us);

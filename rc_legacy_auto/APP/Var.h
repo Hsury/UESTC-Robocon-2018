@@ -22,6 +22,13 @@ extern float VelZ;
 
 extern float PosX;
 extern float PosY;
-extern float AngZ;
+extern float PosZ;
+
+extern float GoalX;
+extern float GoalY;
+extern float GoalZ;
+
+extern float GY53A;
+extern float GY53B;
 
 #endif

@@ -13,7 +13,7 @@
                         ===== UESTC Robot Probe For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/03/05
+                                        VERSION 2018/03/14
 
 */
 
@@ -49,7 +49,7 @@ TODO List:
 #include "bitmap.h"
 
 #define HW_NAME "AutoRobot"
-#define SW_NAME "20180305"
+#define SW_NAME "20180314"
 
 #define ENABLE_TOUCH_CALIBRATE 0
 #define ENABLE_CAN_DEBUG 0
@@ -100,9 +100,10 @@ P.P.S. TFT and Touchscreen are using VSPI, transactions (To work with other devi
 
 #define Gyroscope_ID 0x11
 #define Encoder_ID 0x12
-#define DT35_H_ID 0x50
-#define DT35_F_ID 0x51
-#define DT35_R_ID 0x52
+#define GY53_A_ID 0x21
+#define GY53_B_ID 0x22
+#define DT35_ID 0x23
+#define Timer_ID 0xA0
 #define TouchScreen_ID 0x60
 #define Cradle_ID 0x72
 #define Hint_Tone_ID 0x74
@@ -166,8 +167,10 @@ uint16_t LogPtr = 0;
 
 uint32_t DeviceNotify[NOTIFY_DEVICE_NUM];
 float Gyroscope;
-int32_t Encoder[2]; // X-Y coordinate
-int32_t DT35[3]; // Array to save the data of DT35s
+float Encoder[2]; // X-Y coordinate
+float GY53[2]; // Array to save the data of GY53s
+int32_t DT35;
+uint32_t Timer[8];
 uint16_t TouchScreen[2]; // X-Y coordinate
 
 boolean isRTC = false;
@@ -590,14 +593,30 @@ void TFTTask(void * pvParameters)
                     tft.drawString("Gyro:", 144, 64);
                     tft.drawString("Encoder[X]:", 144, 88);
                     tft.drawString("Encoder[Y]:", 144, 112);
-                    tft.drawString("DT35[H]:", 144, 136);
-                    tft.drawString("DT35[F]:", 144, 160);
-                    tft.drawString("DT35[R]:", 144, 184);
+                    tft.drawString("GY53[A]:", 144, 136);
+                    tft.drawString("GY53[B]:", 144, 160);
+                    tft.drawString("DT35:", 144, 184);
+                    tft.drawString("User:", 144, 208);
                     tft.setTextFont(2);
                     tft.setTextDatum(TL_DATUM);
                     break;
 
-                    case 1: // @Variable.TouchScreen
+                    case 1: // @Variable.Timer
+                    tft.setFreeFont(&FreeSans9pt7b);
+                    tft.setTextDatum(R_BASELINE);
+                    tft.drawString("Timer 1:", 144, 64);
+                    tft.drawString("Timer 2:", 144, 88);
+                    tft.drawString("Timer 3:", 144, 112);
+                    tft.drawString("Timer 4:", 144, 136);
+                    tft.drawString("Timer 5:", 144, 160);
+                    tft.drawString("Timer 6:", 144, 184);
+                    tft.drawString("Timer 7:", 144, 208);
+                    tft.drawString("Timer 8:", 144, 232);
+                    tft.setTextFont(2);
+                    tft.setTextDatum(TL_DATUM);
+                    break;
+
+                    case 2: // @Variable.TouchScreen
                     tft.setTextDatum(CC_DATUM);
                     tft.drawString("TouchScreen", 160, 42);
                     tft.setTextDatum(TL_DATUM);
@@ -620,18 +639,36 @@ void TFTTask(void * pvParameters)
                 tft.setFreeFont(&FreeSans9pt7b);
                 tft.setTextDatum(L_BASELINE);
                 tft.setTextPadding(160);
-                tft.drawString(String(Gyroscope, 6), 160, 64);
-                tft.drawString(String(Encoder[0]), 160, 88);
-                tft.drawString(String(Encoder[1]), 160, 112);
-                tft.drawString(String(DT35[0]), 160, 136);
-                tft.drawString(String(DT35[1]), 160, 160);
-                tft.drawString(String(DT35[2]), 160, 184);
+                tft.drawString(String(Gyroscope, 3), 160, 64);
+                tft.drawString(String(Encoder[0], 3), 160, 88);
+                tft.drawString(String(Encoder[1], 3), 160, 112);
+                tft.drawString(String(GY53[0], 3), 160, 136);
+                tft.drawString(String(GY53[1], 3), 160, 160);
+                tft.drawString(String(DT35), 160, 184);
+                //tft.drawString(String(Timer[0]), 160, 208);
                 tft.setTextFont(2);
                 tft.setTextDatum(TL_DATUM);
                 tft.setTextPadding(0);
                 break;
 
                 case 1:
+                tft.setFreeFont(&FreeSans9pt7b);
+                tft.setTextDatum(L_BASELINE);
+                tft.setTextPadding(160);
+                tft.drawString(String(Timer[0]), 160, 64);
+                tft.drawString(String(Timer[1]), 160, 88);
+                tft.drawString(String(Timer[2]), 160, 112);
+                tft.drawString(String(Timer[3]), 160, 136);
+                tft.drawString(String(Timer[4]), 160, 160);
+                tft.drawString(String(Timer[5]), 160, 184);
+                tft.drawString(String(Timer[6]), 160, 208);
+                tft.drawString(String(Timer[7]), 160, 232);
+                tft.setTextFont(2);
+                tft.setTextDatum(TL_DATUM);
+                tft.setTextPadding(0);
+                break;
+
+                case 2:
                 tft.setTextDatum(CC_DATUM);
                 tft.setTextPadding(108);
                 tft.drawString('(' + String(TouchScreen[0]) + ", " + String(TouchScreen[1]) + ')', 160, 60);
@@ -720,7 +757,7 @@ void TFTTask(void * pvParameters)
             {
                 CAN_frame_t CAN_rx_frame_holder = CAN_rx_frame; // Avoid data being updated when displayed
                 tft.setCursor(0, yPos);
-                tft.printf("%-7u  |  0x%-4X  | ", packNum, CAN_rx_frame_holder.MsgID);
+                tft.printf("%-9u | 0x%-4X |", packNum, CAN_rx_frame_holder.MsgID);
                 for (uint8_t i = 0; i < CAN_rx_frame_holder.FIR.B.DLC; i++)
                 {
                     tft.printf(" %02X", CAN_rx_frame_holder.data.u8[i]);
@@ -858,12 +895,12 @@ void TFTTask(void * pvParameters)
                 else if (xTouch >= 32 && xTouch <= 64 && yTouch >= 0 && yTouch <= 32) // Previous page
                 {
                     if (subScene > 0) subScene--;
-                    else subScene = 1;
+                    else subScene = 2;
                     redraw = true;
                 }
                 else if (xTouch >= 256 && xTouch <= 288 && yTouch >= 0 && yTouch <= 32) // Next page
                 {
-                    if (subScene < 1) subScene++;
+                    if (subScene < 2) subScene++;
                     else subScene = 0;
                     redraw = true;
                 }
@@ -1019,37 +1056,46 @@ void CANRecvTask(void * pvParameters)
         packNum++;
         if (CAN_rx_frame.FIR.B.FF == CAN_frame_std && CAN_rx_frame.FIR.B.RTR != CAN_RTR) // Software CAN filter
         {
+            float FTmp;
+            int32_t STmp;
             switch (CAN_rx_frame.MsgID)
             {
                 case Gyroscope_ID:
                 DeviceNotify[0] = millis();
-                memcpy(&Gyroscope, &CAN_rx_frame.data.u8[0], 4);
+                memcpy(&FTmp, &CAN_rx_frame.data.u8[0], 4);
+                Gyroscope = FTmp >= 0 ? fmod(FTmp, 360) : fmod(FTmp, 360) + 360;
                 break;
 
                 case Encoder_ID:
                 DeviceNotify[1] = millis();
-                memcpy(&Encoder[0], &CAN_rx_frame.data.u8[0], 4);
-                memcpy(&Encoder[1], &CAN_rx_frame.data.u8[4], 4);
+                memcpy(&STmp, &CAN_rx_frame.data.u8[0], 4);
+                Encoder[0] = STmp * PI * 50.7 / 2000 / 1000;
+                memcpy(&STmp, &CAN_rx_frame.data.u8[4], 4);
+                Encoder[1] = STmp * PI * 50.7 / 2000 / 1000;
                 break;
 
-                case DT35_H_ID:
+                case GY53_A_ID:
                 DeviceNotify[2] = millis();
-                memcpy(&DT35[0], &CAN_rx_frame.data.u8[0], 4);
+                memcpy(&GY53[0], &CAN_rx_frame.data.u8[0], 4);
                 break;
 
-                case DT35_F_ID:
+                case GY53_B_ID:
                 DeviceNotify[3] = millis();
-                memcpy(&DT35[1], &CAN_rx_frame.data.u8[0], 4);
+                memcpy(&GY53[1], &CAN_rx_frame.data.u8[0], 4);
                 break;
 
-                case DT35_R_ID:
+                case DT35_ID:
                 DeviceNotify[4] = millis();
-                memcpy(&DT35[2], &CAN_rx_frame.data.u8[0], 4);
+                memcpy(&DT35, &CAN_rx_frame.data.u8[0], 4);
                 break;
 
                 case TouchScreen_ID:
                 memcpy(&TouchScreen[0], &CAN_rx_frame.data.u8[0], 2);
                 memcpy(&TouchScreen[1], &CAN_rx_frame.data.u8[2], 2);
+                break;
+
+                case Timer_ID:
+                if (CAN_rx_frame.data.u8[0] < 8) memcpy(&Timer[CAN_rx_frame.data.u8[0]], &CAN_rx_frame.data.u8[1], 4);
                 break;
 
                 case Cradle_ID:

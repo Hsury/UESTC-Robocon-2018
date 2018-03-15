@@ -49,13 +49,13 @@
   static CANQUEUE QUEUE_CAN_ID15;
 #endif
 
-CANQUEUE *QUEUE_CAN_IDx;         //Ö¸Ïò¶ÓÁĞµÄÖ¸Õë
+CANQUEUE *QUEUE_CAN_IDx;         //æŒ‡å‘é˜Ÿåˆ—çš„æŒ‡é’ˆ
 
 static Elmo elmo[ELMO_NUM + 1];
 static Elmo elmogroup;
-static CAN_TypeDef* can = CAN1;         //³õÊ¼»¯Ñ¡ÔñCANxµÄ½Ó¿Ú±äÁ¿
-static uint8_t CAN_Error = 0;         //Èç¹ûCAN·¢ËÍÊ§°Ü£¬CAN_ErrorÖÃ1
-static uint32_t Elmo_Init_Flag = 0;   //ÓÃÀ´¼ÇÂ¼ELMOÊµ¼ÊµÄ³õÊ¼»¯µÄ×´Ì¬
+static CAN_TypeDef* can = CAN1;         //åˆå§‹åŒ–é€‰æ‹©CANxçš„æ¥å£å˜é‡
+static uint8_t CAN_Error = 0;         //å¦‚æœCANå‘é€å¤±è´¥ï¼ŒCAN_Errorç½®1
+static uint32_t Elmo_Init_Flag = 0;   //ç”¨æ¥è®°å½•ELMOå®é™…çš„åˆå§‹åŒ–çš„çŠ¶æ€
 
 //extern Arm_Struct Im_Arm;
 /*
@@ -63,76 +63,76 @@ static uint32_t Elmo_Init_Flag = 0;   //ÓÃÀ´¼ÇÂ¼ELMOÊµ¼ÊµÄ³õÊ¼»¯µÄ×´Ì¬
   *@  name      : CAN_init
   *@  function  : Initialization for CAN
   *@  input     : CANx      CAN1 or CAN2
-  *@			  PPr       TIM7µÄÇÀÕ¼ÓÅÏÈ¼¶
-  *@              SPr       TIM7µÄ´ÓÓÅÏÈ¼¶
-  *@  output    : 0	        ³õÊ¼»¯³É¹¦
-  *@              1         ³õÊ¼»¯Ê§°Ü
+  *@			  PPr       TIM7çš„æŠ¢å ä¼˜å…ˆçº§
+  *@              SPr       TIM7çš„ä»ä¼˜å…ˆçº§
+  *@  output    : 0	        åˆå§‹åŒ–æˆåŠŸ
+  *@              1         åˆå§‹åŒ–å¤±è´¥
 ********************************************************************************
 */
 uint32_t Elmo_Init(CAN_TypeDef* CANx, uint8_t PPr, uint8_t SPr)
 {  
 	uint8_t i = 0;
 	int temp = 0;
-	/* Ó²¼ş¼°È«¾Ö±äÁ¿³õÊ¼»¯ */ 
+	/* ç¡¬ä»¶åŠå…¨å±€å˜é‡åˆå§‹åŒ– */ 
 	//CAN_init( CANx );
     can = CANx;
 	TIM7_init( PPr, SPr);	
 
-	/*¶¨Òå±äÁ¿³õÊ¼»¯*/
+	/*å®šä¹‰å˜é‡åˆå§‹åŒ–*/
 	Variate_init();
 
-	/* ¶Ôelmo·ÖÅä½ÚµãID */
+	/* å¯¹elmoåˆ†é…èŠ‚ç‚¹ID */
 	for(i=0; i <= ELMO_NUM; i++)
 	{
 		elmo[i].NodeID = i;			
 	}
 
-	/* ¶Ôelmo·ÖÅä×éID */
+	/* å¯¹elmoåˆ†é…ç»„ID */
 	elmogroup.NodeID = 64;
 
-	/* ¶ÔÈ«Ìå½Úµã½øĞĞÍ¨ĞÅ¸´Î» */
+	/* å¯¹å…¨ä½“èŠ‚ç‚¹è¿›è¡Œé€šä¿¡å¤ä½ */
 	for(i=1; i <= ELMO_NUM; i++)
 	{
 		NMTCmd(&elmo[i], NMT_RESET_COMMUNICATION);
 		Elmo_Delay100us_IDx(&elmo[i],50);
 	}
 	
-	/* ×Ô¼ì¹¦ÄÜº¯Êı£¬CANËùÓĞELMO³õÊ¼»¯³É¹¦£¬·µ»ØÊıÖµ0£¬·ñÔò¶ÔÓ¦ELMOÎ»ÖÃ0£¬Èç¹ûÖ÷¿ØÃ»ÓĞÉÏÏß£¬·µ»Ø0x80000000 */
+	/* è‡ªæ£€åŠŸèƒ½å‡½æ•°ï¼ŒCANæ‰€æœ‰ELMOåˆå§‹åŒ–æˆåŠŸï¼Œè¿”å›æ•°å€¼0ï¼Œå¦åˆ™å¯¹åº”ELMOä½ç½®0ï¼Œå¦‚æœä¸»æ§æ²¡æœ‰ä¸Šçº¿ï¼Œè¿”å›0x80000000 */
 	if((temp = Self_test()) == 0x80000000 )
 	{
 		return temp;		
 	}
 	
 
-	//	/* µÈ´ıElmoÆô¶¯Íê±Ï,¼´½ÓÊÕµ½Boot up±¨ÎÄ */
+	//	/* ç­‰å¾…Elmoå¯åŠ¨å®Œæ¯•,å³æ¥æ”¶åˆ°Boot upæŠ¥æ–‡ */
 	//	Elmo_Delay100us_IDx(&elmo[elmoID],50);
 
-	/* CANOpenÍ¨ĞÅ²ÎÊı³õÊ¼»¯ */
-	/* RPDO1->0x6040,Ö¸Áî×Ö,2×Ö½Ú,Òì²½´«Êä */
-	// Çı¶¯Æ÷Ä¬ÈÏÓ³Éä,²»ĞèÒªĞŞ¸Ä //
+	/* CANOpené€šä¿¡å‚æ•°åˆå§‹åŒ– */
+	/* RPDO1->0x6040,æŒ‡ä»¤å­—,2å­—èŠ‚,å¼‚æ­¥ä¼ è¾“ */
+	// é©±åŠ¨å™¨é»˜è®¤æ˜ å°„,ä¸éœ€è¦ä¿®æ”¹ //
 
-	/* RPDO2->0x2012,¶ş½øÖÆ±àÒëÊäÈë,4×Ö½Ú,Òì²½´«Êä */
-	// Çı¶¯Æ÷Ä¬ÈÏÓ³Éä,²»ĞèÒªĞŞ¸Ä //
+	/* RPDO2->0x2012,äºŒè¿›åˆ¶ç¼–è¯‘è¾“å…¥,4å­—èŠ‚,å¼‚æ­¥ä¼ è¾“ */
+	// é©±åŠ¨å™¨é»˜è®¤æ˜ å°„,ä¸éœ€è¦ä¿®æ”¹ //
 
-	/* ½ûÓÃTPDO,DebugÊ±¿ªÆô,µçÁ÷»·Ê±×îºÃ¹Ø±Õ */
-	RSDO(&elmo[0], 0x1A00, 0x00, 0);//½ûÓÃPDO1
+	/* ç¦ç”¨TPDO,Debugæ—¶å¼€å¯,ç”µæµç¯æ—¶æœ€å¥½å…³é—­ */
+	RSDO(&elmo[0], 0x1A00, 0x00, 0);//ç¦ç”¨PDO1
 	Elmo_Delay100us_IDx(&elmo[0],150);
-	RSDO(&elmo[0], 0x1A01, 0x00, 0);//½ûÓÃPDO2 ×îºóÊ¹ÓÃµÄÊÇPdo2
+	RSDO(&elmo[0], 0x1A01, 0x00, 0);//ç¦ç”¨PDO2 æœ€åä½¿ç”¨çš„æ˜¯Pdo2
 	Elmo_Delay100us_IDx(&elmo[0],150);
 
-	/* ½øÈëNMT²Ù×÷×´Ì¬ */
+	/* è¿›å…¥NMTæ“ä½œçŠ¶æ€ */
 	Elmo_Delay100us_IDx(&elmo[0],40);
 	NMTCmd(&elmo[0], NMT_ENTER_OPERATIONAL);
 	Elmo_Delay100us_IDx(&elmo[0],40);
 
-	/* ¹Ø±ÕÇı¶¯ */
+	/* å…³é—­é©±åŠ¨ */
 	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_OFF);
 	Elmo_Delay100us_IDx(&elmo[0],80);
 
-	/* ³õÊ¼»¯¼ÓËÙ¶È */
+	/* åˆå§‹åŒ–åŠ é€Ÿåº¦ */
 	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"PM", 0, TYPE_INTEGER, 0x01);
 	Elmo_Delay100us_IDx(&elmo[0],40);	
-	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"AC", 0, TYPE_INTEGER, 50000000);
+	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"AC", 0, TYPE_INTEGER, 250000000);
 	Elmo_Delay100us_IDx(&elmo[0],40);
 	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"DC", 0, TYPE_INTEGER, 500000000);
 	Elmo_Delay100us_IDx(&elmo[0],40);
@@ -146,7 +146,7 @@ uint32_t Elmo_Init(CAN_TypeDef* CANx, uint8_t PPr, uint8_t SPr)
 		elmo[i].CurOPMode = UM_SCM;			
 	}
 
-	/* Ê¹ÄÜÇı¶¯ */
+	/* ä½¿èƒ½é©±åŠ¨ */
 	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 	Elmo_Delay100us_IDx(&elmo[0],250);
 	Elmo_Delay100us_IDx(&elmo[0],250);
@@ -157,50 +157,50 @@ uint32_t Elmo_Init(CAN_TypeDef* CANx, uint8_t PPr, uint8_t SPr)
 void Elmo_Reinit(uint8_t elmoID)
 {
     
-    RSDO(&elmo[elmoID], 0x6040, 0x00, 0x80);  //Çå³ı´íÎó±êÖ¾Î»
+    RSDO(&elmo[elmoID], 0x6040, 0x00, 0x80);  //æ¸…é™¤é”™è¯¯æ ‡å¿—ä½
     Elmo_Delay100us_IDx(&elmo[elmoID],20);
     
-    RSDO(&elmo[elmoID], 0x2f41, 0x00, 0x02);     //  Æô¶¯PPM 
+    RSDO(&elmo[elmoID], 0x2f41, 0x00, 0x02);     //  å¯åŠ¨PPM 
     Elmo_Delay100us_IDx(&elmo[elmoID],20);
     
     NMTCmd(&elmo[elmoID], NMT_RESET_COMMUNICATION);
     Elmo_Delay100us_IDx(&elmo[elmoID],30);
     
-    /* ½øÈëNMT²Ù×÷×´Ì¬ */
+    /* è¿›å…¥NMTæ“ä½œçŠ¶æ€ */
 	NMTCmd(&elmo[elmoID], NMT_ENTER_OPERATIONAL);
 	Elmo_Delay100us_IDx(&elmo[elmoID],30);
     
-    /* ³õÊ¼»¯¼ÓËÙ¶È */
+    /* åˆå§‹åŒ–åŠ é€Ÿåº¦ */
 	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"PM", 0, TYPE_INTEGER, 0x01);
-	Elmo_Delay100us_IDx(&elmo[elmoID],20); //×î´ó¼ÓËÙ¶È1000000000 1000000
+	Elmo_Delay100us_IDx(&elmo[elmoID],20); //æœ€å¤§åŠ é€Ÿåº¦1000000000 1000000
 	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"AC", 0, TYPE_INTEGER, 1000000);
-	Elmo_Delay100us_IDx(&elmo[elmoID],40); //×î´ó¼õËÙ¶È1000000000
+	Elmo_Delay100us_IDx(&elmo[elmoID],40); //æœ€å¤§å‡é€Ÿåº¦1000000000
 	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"DC", 0, TYPE_INTEGER, 1000000);
 	Elmo_Delay100us_IDx(&elmo[elmoID],40);             
     
-    /* ¹Ø±ÕÇı¶¯ */
+    /* å…³é—­é©±åŠ¨ */
 	RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_OFF);
 	Elmo_Delay100us_IDx(&elmo[elmoID],30);
     
-    /* Ê¹ÄÜÇı¶¯ */
+    /* ä½¿èƒ½é©±åŠ¨ */
 	RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 	Elmo_Delay100us_IDx(&elmo[elmoID],60);
 }
 /*
 ********************************************************************************
   *@  name      : Elmo_PTM
-  *@  function  : µ¥ÖáÁ¦¾ØÄ£Ê½º¯Êı
-  *@  input     : elmoID    È¡elmo½ÚµãID,ÇëÎğÔÚµ×ÅÌ¿ØÖÆÖĞµ÷ÓÃelmo[1]~elmo[4]
-  *@ 			  torque    Ä¿±ê×ª¾Ø(A)
-  *@  output    : 0         º¯Êıµ÷ÓÃ³É¹¦
-  *@              1         º¯Êıµ÷ÓÃÊ§°Ü
+  *@  function  : å•è½´åŠ›çŸ©æ¨¡å¼å‡½æ•°
+  *@  input     : elmoID    å–elmoèŠ‚ç‚¹ID,è¯·å‹¿åœ¨åº•ç›˜æ§åˆ¶ä¸­è°ƒç”¨elmo[1]~elmo[4]
+  *@ 			  torque    ç›®æ ‡è½¬çŸ©(A)
+  *@  output    : 0         å‡½æ•°è°ƒç”¨æˆåŠŸ
+  *@              1         å‡½æ•°è°ƒç”¨å¤±è´¥
 ********************************************************************************
 */
 uint8_t Elmo_PTM(uint8_t elmoID, float torque)
 {
     uint8_t i = 0;
 	
-	/* Èç¹ûÊ¹ÓÃ¹ã²¥¿ØÖÆ, µ±Ç°Ä£Ê½²»ÎªµçÁ÷Ä£Ê½,ÇĞ»»ÎªµçÁ÷Ä£Ê½*/
+	/* å¦‚æœä½¿ç”¨å¹¿æ’­æ§åˆ¶, å½“å‰æ¨¡å¼ä¸ä¸ºç”µæµæ¨¡å¼,åˆ‡æ¢ä¸ºç”µæµæ¨¡å¼*/
 	if(elmoID == 0 && elmo[elmoID].CurOPMode != UM_TCM)  
 	{
 		if( elmo[elmoID].CurOPMode != UM_IDLE)
@@ -209,7 +209,7 @@ uint8_t Elmo_PTM(uint8_t elmoID, float torque)
 			Elmo_Delay100us_IDx(&elmo[elmoID],100);
 		}		
 		
-		/* ½«ËùÓĞ×´Ì¬±äÁ¿¸³ÖµÎªTCM */
+		/* å°†æ‰€æœ‰çŠ¶æ€å˜é‡èµ‹å€¼ä¸ºTCM */
 		elmogroup.CurOPMode = UM_TCM;			
 		for(i=0;i<=ELMO_NUM;i++)
 		{
@@ -222,7 +222,7 @@ uint8_t Elmo_PTM(uint8_t elmoID, float torque)
 		RPDO2_Cmd_data( &elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 		Elmo_Delay100us_IDx(&elmo[elmoID],30);
 	}  
-	/* Ê¹ÓÃµ¥¸öELMO¿ØÖÆ,µ±Ç°Ä£Ê½²»ÎªµçÁ÷Ä£Ê½,ÇĞ»»ÎªµçÁ÷Ä£Ê½ */
+	/* ä½¿ç”¨å•ä¸ªELMOæ§åˆ¶,å½“å‰æ¨¡å¼ä¸ä¸ºç”µæµæ¨¡å¼,åˆ‡æ¢ä¸ºç”µæµæ¨¡å¼ */
  	else if( elmo[elmoID].CurOPMode != UM_TCM)         
 	{
 		if( elmo[elmoID].CurOPMode != UM_IDLE)
@@ -237,12 +237,12 @@ uint8_t Elmo_PTM(uint8_t elmoID, float torque)
 		RPDO2_Cmd_data( &elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 		Elmo_Delay100us_IDx(&elmo[elmoID],30);
 		
-        /* Èç¹ûELMOÖ»¹ÒÔØÁË1¸ö£¬²»¹ÜÔõÃ´¸ÄÆäµÄÄ£Ê½£¬elmo[0]µÄÄ£Ê½ºÍËüÒ»Ñù */		
+        /* å¦‚æœELMOåªæŒ‚è½½äº†1ä¸ªï¼Œä¸ç®¡æ€ä¹ˆæ”¹å…¶çš„æ¨¡å¼ï¼Œelmo[0]çš„æ¨¡å¼å’Œå®ƒä¸€æ · */		
 		if(ELMO_NUM == 1)
 		{
 			elmo[0].CurOPMode = UM_TCM;
 		}	
-		/* ÓÃÀ´ÅĞ¶ÏÊÇ·ñËùÓĞµç»úÄ£Ê½ÏàÍ¬£¬´Ó¶øÈ·¶¨elmo[0]µÄÄ£Ê½ */
+		/* ç”¨æ¥åˆ¤æ–­æ˜¯å¦æ‰€æœ‰ç”µæœºæ¨¡å¼ç›¸åŒï¼Œä»è€Œç¡®å®šelmo[0]çš„æ¨¡å¼ */
 		else 
 		{
 			for(i=1;i<ELMO_NUM;i++)  
@@ -260,7 +260,7 @@ uint8_t Elmo_PTM(uint8_t elmoID, float torque)
 		}
 	}
 		
-	/* ÉèÖÃÄ¿±ê×ª¾Ø²¢ÔËĞĞµçÁ÷Ä£Ê½ */
+	/* è®¾ç½®ç›®æ ‡è½¬çŸ©å¹¶è¿è¡Œç”µæµæ¨¡å¼ */
 	RPDO2_Cmd_data( &elmo[elmoID], (uint8_t *)"TC", 0, TYPE_FLOAT, f2h(torque));
 	Elmo_Delay100us_IDx(&elmo[elmoID],10);
 	return 0;
@@ -268,8 +268,8 @@ uint8_t Elmo_PTM(uint8_t elmoID, float torque)
 /*
 ********************************************************************************
   *@  name      : Elmo_Pre_PVM
-  *@  function  : ËÙ¶ÈÄ£Ê½Ô¤´¦Àíº¯Êı
-  *@  input     : elmoID   È¡elmo½ÚµãID
+  *@  function  : é€Ÿåº¦æ¨¡å¼é¢„å¤„ç†å‡½æ•°
+  *@  input     : elmoID   å–elmoèŠ‚ç‚¹ID
   *@  output    : none
 ********************************************************************************
 */
@@ -277,7 +277,7 @@ void Elmo_Pre_PVM(uint8_t elmoID)
 {
 	 uint8_t i = 0;
 	
-	/* Èç¹ûÊ¹ÓÃ¹ã²¥¿ØÖÆ,µ±Ç°Ä£Ê½²»ÎªËÙ¶ÈÄ£Ê½,ÇĞ»»ÎªËÙ¶ÈÄ£Ê½ */
+	/* å¦‚æœä½¿ç”¨å¹¿æ’­æ§åˆ¶,å½“å‰æ¨¡å¼ä¸ä¸ºé€Ÿåº¦æ¨¡å¼,åˆ‡æ¢ä¸ºé€Ÿåº¦æ¨¡å¼ */
 	if(elmoID == 0 && elmo[elmoID].CurOPMode != UM_SCM)
 	{
 		if(elmo[elmoID].CurOPMode != UM_IDLE)
@@ -286,7 +286,7 @@ void Elmo_Pre_PVM(uint8_t elmoID)
 			Elmo_Delay100us_IDx(&elmo[elmoID],100);
 		}	
 		
-		/* ½«ËùÓĞ×´Ì¬±äÁ¿¸³ÖµÎªSCM */
+		/* å°†æ‰€æœ‰çŠ¶æ€å˜é‡èµ‹å€¼ä¸ºSCM */
 		elmogroup.CurOPMode = UM_SCM;			
 		for(i=0;i<=ELMO_NUM;i++)
 		{
@@ -300,7 +300,7 @@ void Elmo_Pre_PVM(uint8_t elmoID)
 		Elmo_Delay100us_IDx(&elmo[elmoID],30);
 		
 	}  
-	/* Ê¹ÓÃµ¥¸öELMO¿ØÖÆ,µ±Ç°Ä£Ê½²»ÎªËÙ¶ÈÄ£Ê½,ÇĞ»»ÎªËÙ¶ÈÄ£Ê½*/
+	/* ä½¿ç”¨å•ä¸ªELMOæ§åˆ¶,å½“å‰æ¨¡å¼ä¸ä¸ºé€Ÿåº¦æ¨¡å¼,åˆ‡æ¢ä¸ºé€Ÿåº¦æ¨¡å¼*/
 	else if(elmo[elmoID].CurOPMode != UM_SCM)
 	{
 		if(elmo[elmoID].CurOPMode != UM_IDLE)
@@ -316,12 +316,12 @@ void Elmo_Pre_PVM(uint8_t elmoID)
 	    RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 		Elmo_Delay100us_IDx(&elmo[elmoID],30);
 	
-        /* Èç¹ûELMOÖ»¹ÒÔØÁË1¸ö£¬²»¹ÜÔõÃ´¸ÄÆäµÄÄ£Ê½£¬elmo[0]µÄÄ£Ê½ºÍËüÒ»Ñù */				
+        /* å¦‚æœELMOåªæŒ‚è½½äº†1ä¸ªï¼Œä¸ç®¡æ€ä¹ˆæ”¹å…¶çš„æ¨¡å¼ï¼Œelmo[0]çš„æ¨¡å¼å’Œå®ƒä¸€æ · */				
 		if(ELMO_NUM == 1)       
 		{
 			elmo[0].CurOPMode = UM_SCM;
 		}	
-		/* ÓÃÀ´ÅĞ¶ÏÊÇ·ñËùÓĞµç»úÄ£Ê½ÏàÍ¬£¬´Ó¶øÈ·¶¨elmo[0]µÄÄ£Ê½ */
+		/* ç”¨æ¥åˆ¤æ–­æ˜¯å¦æ‰€æœ‰ç”µæœºæ¨¡å¼ç›¸åŒï¼Œä»è€Œç¡®å®šelmo[0]çš„æ¨¡å¼ */
 		else
 		{
 			for(i=1;i<ELMO_NUM;i++) 
@@ -343,11 +343,11 @@ void Elmo_Pre_PVM(uint8_t elmoID)
 /*
 ********************************************************************************
   *@  name      : Elmo_PVM
-  *@  function  : µ¥ÖáËÙ¶ÈÄ£Ê½º¯Êı
-  *@  input     : elmoID   È¡elmo½ÚµãID
-  *@			  speed    Ä¿±êËÙ¶È(cnt/s)
-  *@  output    : 0         º¯Êıµ÷ÓÃ³É¹¦
-  *@              1         º¯Êıµ÷ÓÃÊ§°Ü
+  *@  function  : å•è½´é€Ÿåº¦æ¨¡å¼å‡½æ•°
+  *@  input     : elmoID   å–elmoèŠ‚ç‚¹ID
+  *@			  speed    ç›®æ ‡é€Ÿåº¦(cnt/s)
+  *@  output    : 0         å‡½æ•°è°ƒç”¨æˆåŠŸ
+  *@              1         å‡½æ•°è°ƒç”¨å¤±è´¥
 ********************************************************************************
 */
 
@@ -358,7 +358,7 @@ uint8_t Elmo_PVM(uint8_t elmoID, int32_t speed)
 	
 	
 
-//	//µ÷ÊÔ*******************************
+//	//è°ƒè¯•*******************************
 //	#ifdef CASE5_ENABLE
 //	if(elmoID == 8 && Im_Arm.Arm_Init_success == 1)
 //	{
@@ -367,7 +367,7 @@ uint8_t Elmo_PVM(uint8_t elmoID, int32_t speed)
 //		SLIDEWAY_ELMO_SAVE[SLIDEWAY_ELMO_SAVE_count].pos=0;
 //		SLIDEWAY_ELMO_SAVE[SLIDEWAY_ELMO_SAVE_count].OS_t=OSTime;
 //		SLIDEWAY_ELMO_SAVE_count++;
-//		if(SLIDEWAY_ELMO_SAVE_count>=SLIDEWAY_ELMO_SAVE_Max)SLIDEWAY_ELMO_SAVE_count=SLIDEWAY_ELMO_SAVE_Max;  //·ÀÖ¹Ô½½ç
+//		if(SLIDEWAY_ELMO_SAVE_count>=SLIDEWAY_ELMO_SAVE_Max)SLIDEWAY_ELMO_SAVE_count=SLIDEWAY_ELMO_SAVE_Max;  //é˜²æ­¢è¶Šç•Œ
 //	}
 //		if(elmoID == 10 && Im_Arm.Arm_Init_success == 1)
 //	{
@@ -376,14 +376,14 @@ uint8_t Elmo_PVM(uint8_t elmoID, int32_t speed)
 //		SLIDEWAY_ELMO_SAVE_Y[SLIDEWAY_ELMO_SAVE_count_Y].pos=0;
 //		SLIDEWAY_ELMO_SAVE_Y[SLIDEWAY_ELMO_SAVE_count_Y].OS_t=OSTime;
 //		SLIDEWAY_ELMO_SAVE_count_Y++;
-//		if(SLIDEWAY_ELMO_SAVE_count_Y>=SLIDEWAY_ELMO_SAVE_Max)SLIDEWAY_ELMO_SAVE_count_Y=SLIDEWAY_ELMO_SAVE_Max;  //·ÀÖ¹Ô½½ç
+//		if(SLIDEWAY_ELMO_SAVE_count_Y>=SLIDEWAY_ELMO_SAVE_Max)SLIDEWAY_ELMO_SAVE_count_Y=SLIDEWAY_ELMO_SAVE_Max;  //é˜²æ­¢è¶Šç•Œ
 //	}
 //	#endif
-		//µ÷ÊÔ*******************************
+		//è°ƒè¯•*******************************
 	
 	
 	
-	/* Èç¹ûÊ¹ÓÃ¹ã²¥¿ØÖÆ,µ±Ç°Ä£Ê½²»ÎªËÙ¶ÈÄ£Ê½,ÇĞ»»ÎªËÙ¶ÈÄ£Ê½ */
+	/* å¦‚æœä½¿ç”¨å¹¿æ’­æ§åˆ¶,å½“å‰æ¨¡å¼ä¸ä¸ºé€Ÿåº¦æ¨¡å¼,åˆ‡æ¢ä¸ºé€Ÿåº¦æ¨¡å¼ */
 	if(elmoID == 0 && elmo[elmoID].CurOPMode != UM_SCM)
 	{
 		if(elmo[elmoID].CurOPMode != UM_IDLE)
@@ -392,7 +392,7 @@ uint8_t Elmo_PVM(uint8_t elmoID, int32_t speed)
 			Elmo_Delay100us_IDx(&elmo[elmoID],100);
 		}	
 		
-		/* ½«ËùÓĞ×´Ì¬±äÁ¿¸³ÖµÎªSCM */
+		/* å°†æ‰€æœ‰çŠ¶æ€å˜é‡èµ‹å€¼ä¸ºSCM */
 		elmogroup.CurOPMode = UM_SCM;			
 		for(i=0;i<=ELMO_NUM;i++)
 		{
@@ -406,7 +406,7 @@ uint8_t Elmo_PVM(uint8_t elmoID, int32_t speed)
 		Elmo_Delay100us_IDx(&elmo[elmoID],30);
 		
 	}  
-	/* Ê¹ÓÃµ¥¸öELMO¿ØÖÆ,µ±Ç°Ä£Ê½²»ÎªËÙ¶ÈÄ£Ê½,ÇĞ»»ÎªËÙ¶ÈÄ£Ê½*/
+	/* ä½¿ç”¨å•ä¸ªELMOæ§åˆ¶,å½“å‰æ¨¡å¼ä¸ä¸ºé€Ÿåº¦æ¨¡å¼,åˆ‡æ¢ä¸ºé€Ÿåº¦æ¨¡å¼*/
 	else if(elmo[elmoID].CurOPMode != UM_SCM)
 	{
 		if(elmo[elmoID].CurOPMode != UM_IDLE)
@@ -422,12 +422,12 @@ uint8_t Elmo_PVM(uint8_t elmoID, int32_t speed)
 	    RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 		Elmo_Delay100us_IDx(&elmo[elmoID],30);
 	
-        /* Èç¹ûELMOÖ»¹ÒÔØÁË1¸ö£¬²»¹ÜÔõÃ´¸ÄÆäµÄÄ£Ê½£¬elmo[0]µÄÄ£Ê½ºÍËüÒ»Ñù */				
+        /* å¦‚æœELMOåªæŒ‚è½½äº†1ä¸ªï¼Œä¸ç®¡æ€ä¹ˆæ”¹å…¶çš„æ¨¡å¼ï¼Œelmo[0]çš„æ¨¡å¼å’Œå®ƒä¸€æ · */				
 		if(ELMO_NUM == 1)       
 		{
 			elmo[0].CurOPMode = UM_SCM;
 		}	
-		/* ÓÃÀ´ÅĞ¶ÏÊÇ·ñËùÓĞµç»úÄ£Ê½ÏàÍ¬£¬´Ó¶øÈ·¶¨elmo[0]µÄÄ£Ê½ */
+		/* ç”¨æ¥åˆ¤æ–­æ˜¯å¦æ‰€æœ‰ç”µæœºæ¨¡å¼ç›¸åŒï¼Œä»è€Œç¡®å®šelmo[0]çš„æ¨¡å¼ */
 		else
 		{
 			for(i=1;i<ELMO_NUM;i++) 
@@ -445,11 +445,11 @@ uint8_t Elmo_PVM(uint8_t elmoID, int32_t speed)
 		}
 	}
 
-	/* ÉèÖÃÄ¿±êËÙ¶È */
+	/* è®¾ç½®ç›®æ ‡é€Ÿåº¦ */
 	RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"JV", 0, TYPE_INTEGER, speed);
 	Elmo_Delay100us_IDx(&elmo[elmoID],10);
 
-	/* ÔËĞĞËÙ¶ÈÄ£Ê½ */
+	/* è¿è¡Œé€Ÿåº¦æ¨¡å¼ */
 	RPDO2_Cmd_string(&elmo[elmoID], (uint8_t *)"BG");
 	Elmo_Delay100us_IDx(&elmo[elmoID],10);
 	return 0;
@@ -458,22 +458,22 @@ uint8_t Elmo_PVM(uint8_t elmoID, int32_t speed)
 /*
 ********************************************************************************
   *@  name      : Elmo_RunPPM
-  *@  function  : µ¥ÖáÆ½»¬ËÙ¶ÈµÄÎ»ÖÃÄ£Ê½
-  *@  input     : elmoID    È¡elmo½ÚµãID
-  *@              speed     ËÙ¶È(cnt/s)
-  *@              position  Ä¿±êÎ»ÖÃ(cnt)
-  *@              PPMmode   ÔËĞĞÄ£Ê½
-  *@				    POS_ABS // PPMÔËĞĞ·½Ê½:¾ø¶ÔÎ»ÖÃ
-  *@				    POS_REL // PPMÔËĞĞ·½Ê½:Ïà¶ÔÎ»ÖÃ
-  *@  output    : 0         º¯Êıµ÷ÓÃ³É¹¦
-  *@              1         º¯Êıµ÷ÓÃÊ§°Ü
+  *@  function  : å•è½´å¹³æ»‘é€Ÿåº¦çš„ä½ç½®æ¨¡å¼
+  *@  input     : elmoID    å–elmoèŠ‚ç‚¹ID
+  *@              speed     é€Ÿåº¦(cnt/s)
+  *@              position  ç›®æ ‡ä½ç½®(cnt)
+  *@              PPMmode   è¿è¡Œæ¨¡å¼
+  *@				    POS_ABS // PPMè¿è¡Œæ–¹å¼:ç»å¯¹ä½ç½®
+  *@				    POS_REL // PPMè¿è¡Œæ–¹å¼:ç›¸å¯¹ä½ç½®
+  *@  output    : 0         å‡½æ•°è°ƒç”¨æˆåŠŸ
+  *@              1         å‡½æ•°è°ƒç”¨å¤±è´¥
 ********************************************************************************
 */
 uint8_t Elmo_PPM(uint8_t elmoID, uint32_t speed, int32_t position, uint8_t PPMmode)
 {
 	uint8_t i = 0;
 
-	//µ÷ÊÔ*******************************
+	//è°ƒè¯•*******************************
 //	#ifdef CASE5_ENABLE
 //	if(elmoID == 8 && Im_Arm.Arm_Init_success == 1)
 //	{
@@ -482,7 +482,7 @@ uint8_t Elmo_PPM(uint8_t elmoID, uint32_t speed, int32_t position, uint8_t PPMmo
 //		SLIDEWAY_ELMO_SAVE[SLIDEWAY_ELMO_SAVE_count].pos=position;
 //		SLIDEWAY_ELMO_SAVE[SLIDEWAY_ELMO_SAVE_count].OS_t=OSTime;
 //		SLIDEWAY_ELMO_SAVE_count++;
-//		if(SLIDEWAY_ELMO_SAVE_count>=SLIDEWAY_ELMO_SAVE_Max)SLIDEWAY_ELMO_SAVE_count=SLIDEWAY_ELMO_SAVE_Max;  //·ÀÖ¹Ô½½ç
+//		if(SLIDEWAY_ELMO_SAVE_count>=SLIDEWAY_ELMO_SAVE_Max)SLIDEWAY_ELMO_SAVE_count=SLIDEWAY_ELMO_SAVE_Max;  //é˜²æ­¢è¶Šç•Œ
 //	}
 //		if(elmoID == 10 && Im_Arm.Arm_Init_success == 1)
 //	{
@@ -491,12 +491,12 @@ uint8_t Elmo_PPM(uint8_t elmoID, uint32_t speed, int32_t position, uint8_t PPMmo
 //		SLIDEWAY_ELMO_SAVE_Y[SLIDEWAY_ELMO_SAVE_count_Y].pos=0;
 //		SLIDEWAY_ELMO_SAVE_Y[SLIDEWAY_ELMO_SAVE_count_Y].OS_t=OSTime;
 //		SLIDEWAY_ELMO_SAVE_count_Y++;
-//		if(SLIDEWAY_ELMO_SAVE_count_Y>=SLIDEWAY_ELMO_SAVE_Max)SLIDEWAY_ELMO_SAVE_count_Y=SLIDEWAY_ELMO_SAVE_Max;  //·ÀÖ¹Ô½½ç
+//		if(SLIDEWAY_ELMO_SAVE_count_Y>=SLIDEWAY_ELMO_SAVE_Max)SLIDEWAY_ELMO_SAVE_count_Y=SLIDEWAY_ELMO_SAVE_Max;  //é˜²æ­¢è¶Šç•Œ
 //	}
 //	#endif
-		//µ÷ÊÔ*******************************
+		//è°ƒè¯•*******************************
 
-	/* Èç¹ûÊ¹ÓÃ¹ã²¥¿ØÖÆ,µ±Ç°Ä£Ê½²»ÎªÎ»ÖÃÄ£Ê½,ÇĞ»»ÎªÎ»ÖÃÄ£Ê½ */
+	/* å¦‚æœä½¿ç”¨å¹¿æ’­æ§åˆ¶,å½“å‰æ¨¡å¼ä¸ä¸ºä½ç½®æ¨¡å¼,åˆ‡æ¢ä¸ºä½ç½®æ¨¡å¼ */
 	if(elmoID == 0 && elmo[elmoID].CurOPMode != UM_PCM)
 	{
 		if(elmo[elmoID].CurOPMode != UM_IDLE)
@@ -504,7 +504,7 @@ uint8_t Elmo_PPM(uint8_t elmoID, uint32_t speed, int32_t position, uint8_t PPMmo
 			RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_OFF);
 			Elmo_Delay100us_IDx(&elmo[elmoID],90);
 		}	
-		/* ½«ËùÓĞ×´Ì¬±äÁ¿¸³ÖµÎªPCM */		
+		/* å°†æ‰€æœ‰çŠ¶æ€å˜é‡èµ‹å€¼ä¸ºPCM */		
 		elmogroup.CurOPMode = UM_PCM;			
 		for(i=0;i<=ELMO_NUM;i++)
 		{
@@ -517,7 +517,7 @@ uint8_t Elmo_PPM(uint8_t elmoID, uint32_t speed, int32_t position, uint8_t PPMmo
 		RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 		Elmo_Delay100us_IDx(&elmo[elmoID],30);
 	}  
-	/* Ê¹ÓÃµ¥¸öELMO¿ØÖÆ,µ±Ç°Ä£Ê½²»ÎªÎ»ÖÃÄ£Ê½,ÇĞ»»ÎªÎ»ÖÃÄ£Ê½ */
+	/* ä½¿ç”¨å•ä¸ªELMOæ§åˆ¶,å½“å‰æ¨¡å¼ä¸ä¸ºä½ç½®æ¨¡å¼,åˆ‡æ¢ä¸ºä½ç½®æ¨¡å¼ */
 	else if(elmo[elmoID].CurOPMode != UM_PCM)
 	{
 		if(elmo[elmoID].CurOPMode != UM_IDLE)
@@ -534,12 +534,12 @@ uint8_t Elmo_PPM(uint8_t elmoID, uint32_t speed, int32_t position, uint8_t PPMmo
 		Elmo_Delay100us_IDx(&elmo[elmoID],30);
 
 
-        /* Èç¹ûELMOÖ»¹ÒÔØÁË1¸ö£¬²»¹ÜÔõÃ´¸ÄÆäµÄÄ£Ê½£¬elmo[0]µÄÄ£Ê½ºÍËüÒ»Ñù */				
+        /* å¦‚æœELMOåªæŒ‚è½½äº†1ä¸ªï¼Œä¸ç®¡æ€ä¹ˆæ”¹å…¶çš„æ¨¡å¼ï¼Œelmo[0]çš„æ¨¡å¼å’Œå®ƒä¸€æ · */				
 		if(ELMO_NUM == 1)      
 		{
 			elmo[0].CurOPMode = UM_PCM;
 		}		
-		/* ÓÃÀ´ÅĞ¶ÏÊÇ·ñËùÓĞµç»úÄ£Ê½ÏàÍ¬£¬´Ó¶øÈ·¶¨elmo[0]µÄÄ£Ê½ */
+		/* ç”¨æ¥åˆ¤æ–­æ˜¯å¦æ‰€æœ‰ç”µæœºæ¨¡å¼ç›¸åŒï¼Œä»è€Œç¡®å®šelmo[0]çš„æ¨¡å¼ */
 		else 
 		{
 			for(i=1;i<ELMO_NUM;i++) 
@@ -557,11 +557,11 @@ uint8_t Elmo_PPM(uint8_t elmoID, uint32_t speed, int32_t position, uint8_t PPMmo
 		}
 	}
   //RPDO2_Cmd_data(Elmo *elmo, uint8_t *Cmd, uint8_t Index, uint8_t Type, uint32_t Data)
-	/* ÉèÖÃÄ¿±êËÙ¶È */
+	/* è®¾ç½®ç›®æ ‡é€Ÿåº¦ */
 	RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"SP", 0, TYPE_INTEGER, speed);
 	Elmo_Delay100us_IDx(&elmo[elmoID],20);
 
-	/* ¸ù¾İÔËĞĞÄ£Ê½ÉèÖÃÎ»ÖÃ */
+	/* æ ¹æ®è¿è¡Œæ¨¡å¼è®¾ç½®ä½ç½® */
 	if(PPMmode)
 	{
 		RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"PA", 0, TYPE_INTEGER, position);
@@ -573,7 +573,7 @@ uint8_t Elmo_PPM(uint8_t elmoID, uint32_t speed, int32_t position, uint8_t PPMmo
 		Elmo_Delay100us_IDx(&elmo[elmoID],20);
 	}
 	
-	/* ÔËĞĞÎ»ÖÃÄ£Ê½ */
+	/* è¿è¡Œä½ç½®æ¨¡å¼ */
 	RPDO2_Cmd_string(&elmo[elmoID], (uint8_t *)"BG");
 	Elmo_Delay100us_IDx(&elmo[elmoID],10);
 	return 0;
@@ -583,42 +583,42 @@ uint8_t Elmo_PPM(uint8_t elmoID, uint32_t speed, int32_t position, uint8_t PPMmo
 /*
 ********************************************************************************
   *@  name      : Elmo_Close
-  *@  function  : Çı¶¯Êä³ö¹Ø±Õ£¬µç»ú¿¿¹ßĞÔ¼ÌĞøĞĞÊ»
-  *@  input     : elmoID    È¡elmo½ÚµãID,ÇëÎğÔÚµ×ÅÌ¿ØÖÆÖĞµ÷ÓÃelmo[1]~elmo[4]        
-  *@  output    : 0         º¯Êıµ÷ÓÃ³É¹¦
-  *@              1         º¯Êıµ÷ÓÃÊ§°Ü
+  *@  function  : é©±åŠ¨è¾“å‡ºå…³é—­ï¼Œç”µæœºé æƒ¯æ€§ç»§ç»­è¡Œé©¶
+  *@  input     : elmoID    å–elmoèŠ‚ç‚¹ID,è¯·å‹¿åœ¨åº•ç›˜æ§åˆ¶ä¸­è°ƒç”¨elmo[1]~elmo[4]        
+  *@  output    : 0         å‡½æ•°è°ƒç”¨æˆåŠŸ
+  *@              1         å‡½æ•°è°ƒç”¨å¤±è´¥
 ********************************************************************************
 */
 uint8_t Elmo_Close(uint8_t elmoID)
 {
 	uint8_t i = 0;
 	
-    /* Èç¹ûÊ¹ÓÃ¹ã²¥¿ØÖÆ,½«ËùÓĞELMOÊ§ÄÜ */
+    /* å¦‚æœä½¿ç”¨å¹¿æ’­æ§åˆ¶,å°†æ‰€æœ‰ELMOå¤±èƒ½ */
 	if(elmoID == 0)
 	{
 		RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_OFF);
 		Elmo_Delay100us_IDx(&elmo[elmoID],100);
 		
-		/* ½«ËùÓĞ×´Ì¬±äÁ¿¸³ÖµÎªIDLE */		
+		/* å°†æ‰€æœ‰çŠ¶æ€å˜é‡èµ‹å€¼ä¸ºIDLE */		
 		elmogroup.CurOPMode = UM_IDLE;			
 		for(i=0;i<=ELMO_NUM;i++)
 		{
 			elmo[i].CurOPMode = UM_IDLE;			
 		}	    
 	}
-    /* Ê¹ÓÃµ¥¸öELMO¿ØÖÆ */
+    /* ä½¿ç”¨å•ä¸ªELMOæ§åˆ¶ */
 	else 
 	{
 		RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_OFF);
 		Elmo_Delay100us_IDx(&elmo[elmoID],100);
 		elmo[elmoID].CurOPMode = UM_IDLE;		
 
-        /* Èç¹ûELMOÖ»¹ÒÔØÁË1¸ö£¬²»¹ÜÔõÃ´¸ÄÆäµÄÄ£Ê½£¬elmo[0]µÄÄ£Ê½ºÍËüÒ»Ñù */			
+        /* å¦‚æœELMOåªæŒ‚è½½äº†1ä¸ªï¼Œä¸ç®¡æ€ä¹ˆæ”¹å…¶çš„æ¨¡å¼ï¼Œelmo[0]çš„æ¨¡å¼å’Œå®ƒä¸€æ · */			
 		if(ELMO_NUM == 1)       
 		{
 			elmo[0].CurOPMode = UM_IDLE;
 		}		
-		/* ÓÃÀ´ÅĞ¶ÏÊÇ·ñËùÓĞµç»úÄ£Ê½ÏàÍ¬£¬´Ó¶øÈ·¶¨elmo[0]µÄÄ£Ê½ */
+		/* ç”¨æ¥åˆ¤æ–­æ˜¯å¦æ‰€æœ‰ç”µæœºæ¨¡å¼ç›¸åŒï¼Œä»è€Œç¡®å®šelmo[0]çš„æ¨¡å¼ */
 		else 
 		{
 			for(i=1;i<ELMO_NUM;i++)  
@@ -642,17 +642,17 @@ uint8_t Elmo_Close(uint8_t elmoID)
 /*
 ********************************************************************************
   *@  name      : Elmo_Stop
-  *@  function  : É²³µ£¬µç»ú±§ËÀ
-  *@  input     : elmoID      È¡elmo½ÚµãID,ÇëÎğÔÚµ×ÅÌ¿ØÖÆÖĞµ÷ÓÃelmo[1]~elmo[4]        
-  *@  output    : 0         º¯Êıµ÷ÓÃ³É¹¦
-  *@              1         º¯Êıµ÷ÓÃÊ§°Ü
+  *@  function  : åˆ¹è½¦ï¼Œç”µæœºæŠ±æ­»
+  *@  input     : elmoID      å–elmoèŠ‚ç‚¹ID,è¯·å‹¿åœ¨åº•ç›˜æ§åˆ¶ä¸­è°ƒç”¨elmo[1]~elmo[4]        
+  *@  output    : 0         å‡½æ•°è°ƒç”¨æˆåŠŸ
+  *@              1         å‡½æ•°è°ƒç”¨å¤±è´¥
 ********************************************************************************
 */
 uint8_t Elmo_Stop(uint8_t elmoID)
 {
 	uint8_t i = 0;
 
-		//µ÷ÊÔ*******************************
+		//è°ƒè¯•*******************************
 	#ifdef CASE5_ENABLE
 	if(elmoID == 8 && Im_Arm.Arm_Init_success == 1)
 	{
@@ -661,7 +661,7 @@ uint8_t Elmo_Stop(uint8_t elmoID)
 		SLIDEWAY_ELMO_SAVE[SLIDEWAY_ELMO_SAVE_count].pos=0;
 		SLIDEWAY_ELMO_SAVE[SLIDEWAY_ELMO_SAVE_count].OS_t=OSTime;
 		SLIDEWAY_ELMO_SAVE_count++;
-		if(SLIDEWAY_ELMO_SAVE_count>=SLIDEWAY_ELMO_SAVE_Max)SLIDEWAY_ELMO_SAVE_count=SLIDEWAY_ELMO_SAVE_Max;  //·ÀÖ¹Ô½½ç
+		if(SLIDEWAY_ELMO_SAVE_count>=SLIDEWAY_ELMO_SAVE_Max)SLIDEWAY_ELMO_SAVE_count=SLIDEWAY_ELMO_SAVE_Max;  //é˜²æ­¢è¶Šç•Œ
 	}
 		if(elmoID == 10 && Im_Arm.Arm_Init_success == 1)
 	{
@@ -670,22 +670,22 @@ uint8_t Elmo_Stop(uint8_t elmoID)
 		SLIDEWAY_ELMO_SAVE_Y[SLIDEWAY_ELMO_SAVE_count_Y].pos=0;
 		SLIDEWAY_ELMO_SAVE_Y[SLIDEWAY_ELMO_SAVE_count_Y].OS_t=OSTime;
 		SLIDEWAY_ELMO_SAVE_count_Y++;
-		if(SLIDEWAY_ELMO_SAVE_count_Y>=SLIDEWAY_ELMO_SAVE_Max)SLIDEWAY_ELMO_SAVE_count_Y=SLIDEWAY_ELMO_SAVE_Max;  //·ÀÖ¹Ô½½ç
+		if(SLIDEWAY_ELMO_SAVE_count_Y>=SLIDEWAY_ELMO_SAVE_Max)SLIDEWAY_ELMO_SAVE_count_Y=SLIDEWAY_ELMO_SAVE_Max;  //é˜²æ­¢è¶Šç•Œ
 	}
 	#endif
-	/* Èç¹ûCAN×ÜÏßÉÏÖáÓëÖáµÄ¿ØÖÆÄ£Ê½²»ÏàÍ¬£¬ÇÒ·¢³ö¹ã²¥Ö¸Áî£¬ÒÀ´Î¹Ø±Õ */
+	/* å¦‚æœCANæ€»çº¿ä¸Šè½´ä¸è½´çš„æ§åˆ¶æ¨¡å¼ä¸ç›¸åŒï¼Œä¸”å‘å‡ºå¹¿æ’­æŒ‡ä»¤ï¼Œä¾æ¬¡å…³é—­ */
 	if(elmoID == 0 && elmo[elmoID].CurOPMode == UM_UNC)  
 	{
-		/* Ñ­»·ÅĞ¶Ï¸ö¸öµç»úµÄ×´Ì¬£¬²¢¹Ø±ÕÃ¿Ò»¸öµç»ú */
+		/* å¾ªç¯åˆ¤æ–­ä¸ªä¸ªç”µæœºçš„çŠ¶æ€ï¼Œå¹¶å…³é—­æ¯ä¸€ä¸ªç”µæœº */
 		for(i=1;i<=ELMO_NUM;i++)            
 		{		
-			/* µ±Ç°Ä£Ê½ÎªÊÍ·Åµç»ú,ÏÈ´ò¿ªµç»ú£¬ÔÙ±§ËÀ */		
+			/* å½“å‰æ¨¡å¼ä¸ºé‡Šæ”¾ç”µæœº,å…ˆæ‰“å¼€ç”µæœºï¼Œå†æŠ±æ­» */		
 			if (elmo[i].CurOPMode == UM_IDLE) 
 			{
 				RPDO2_Cmd_data(&elmo[i], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 				Elmo_Delay100us_IDx(&elmo[elmoID],30);				
 			}
-			/* µ±Ç°Ä£Ê½ÎªÁ¦¾ØÄ£Ê½,ÏÈÇĞ»»ÎªËÙ¶ÈÄ£Ê½£¬ÔÙ¹Ø±Õ */
+			/* å½“å‰æ¨¡å¼ä¸ºåŠ›çŸ©æ¨¡å¼,å…ˆåˆ‡æ¢ä¸ºé€Ÿåº¦æ¨¡å¼ï¼Œå†å…³é—­ */
 			else if(elmo[i].CurOPMode == UM_TCM)
 			{
 				RPDO2_Cmd_data(&elmo[i], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_OFF);	
@@ -711,11 +711,11 @@ uint8_t Elmo_Stop(uint8_t elmoID)
 				RPDO2_Cmd_data(&elmo[i], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 				Elmo_Delay100us_IDx(&elmo[i],30);
 
-				/* ÉèÖÃÄ¿±êËÙ¶È */
+				/* è®¾ç½®ç›®æ ‡é€Ÿåº¦ */
 				RPDO2_Cmd_data(&elmo[i], (uint8_t *)"JV", 0, TYPE_INTEGER, 0);
 				Elmo_Delay100us_IDx(&elmo[i],10);
 
-				/* ÔËĞĞËÙ¶ÈÄ£Ê½ */
+				/* è¿è¡Œé€Ÿåº¦æ¨¡å¼ */
 				RPDO2_Cmd_string(&elmo[i], (uint8_t *)"BG");
 				Elmo_Delay100us_IDx(&elmo[i],10);
 			}	
@@ -724,12 +724,12 @@ uint8_t Elmo_Stop(uint8_t elmoID)
 			Elmo_Delay100us_IDx(&elmo[i],10);
 		}	
 		
-		/* ÓÃÀ´ÅĞ¶ÏÊÇ·ñËùÓĞµç»úÄ£Ê½ÏàÍ¬£¬´Ó¶øÈ·¶¨elmo[0]µÄÄ£Ê½,ÄÜ¹»½øÈëÕâ¸öifµÄ²»¿ÉÄÜÊÇÔÚCANÏßÉÏÖ»ÓĞµ¥Öá */
+		/* ç”¨æ¥åˆ¤æ–­æ˜¯å¦æ‰€æœ‰ç”µæœºæ¨¡å¼ç›¸åŒï¼Œä»è€Œç¡®å®šelmo[0]çš„æ¨¡å¼,èƒ½å¤Ÿè¿›å…¥è¿™ä¸ªifçš„ä¸å¯èƒ½æ˜¯åœ¨CANçº¿ä¸Šåªæœ‰å•è½´ */
 		for(i=1;i<ELMO_NUM;i++)  
 		{
 			if( elmo[i].CurOPMode == elmo[i+1].CurOPMode )
 			{
-				elmo[0].CurOPMode = UM_SCM;         //Èç¹ûÔÚSTOPÄ£Ê½ÀïÃæµç»úÄ£Ê½Í³Ò»ÁË£¬Ö»ÓĞ¿ÉÄÜÊÇSCMÄ£Ê½
+				elmo[0].CurOPMode = UM_SCM;         //å¦‚æœåœ¨STOPæ¨¡å¼é‡Œé¢ç”µæœºæ¨¡å¼ç»Ÿä¸€äº†ï¼Œåªæœ‰å¯èƒ½æ˜¯SCMæ¨¡å¼
 			}
 			else
 			{
@@ -738,16 +738,16 @@ uint8_t Elmo_Stop(uint8_t elmoID)
 			}
 		}											
 	}
-	/* ·¢³ö¹ã²¥Ö¸Áî£¬µ«ÊÇ×ÜÏßÉÏ¶àÖáµÄ¿ØÖÆÄ£Ê½¶¼ÏàÍ¬£¬ÕâÊ±ºò¿ÉÒÔÒ»Æğ¹Ø±Õ */
+	/* å‘å‡ºå¹¿æ’­æŒ‡ä»¤ï¼Œä½†æ˜¯æ€»çº¿ä¸Šå¤šè½´çš„æ§åˆ¶æ¨¡å¼éƒ½ç›¸åŒï¼Œè¿™æ—¶å€™å¯ä»¥ä¸€èµ·å…³é—­ */
     else if(elmoID == 0 && elmo[elmoID].CurOPMode != UM_UNC)  
 	{
-		/* µ±Ç°Ä£Ê½ÎªÊÍ·Åµç»ú,ÏÈ´ò¿ªµç»ú£¬ÔÙ±§ËÀ */		
+		/* å½“å‰æ¨¡å¼ä¸ºé‡Šæ”¾ç”µæœº,å…ˆæ‰“å¼€ç”µæœºï¼Œå†æŠ±æ­» */		
 		if (elmo[elmoID].CurOPMode == UM_IDLE) 
 		{
 			RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 			Elmo_Delay100us_IDx(&elmo[elmoID],30);				
 		}
-		/* µ±Ç°Ä£Ê½ÎªÁ¦¾ØÄ£Ê½,ÏÈÇĞ»»ÎªËÙ¶ÈÄ£Ê½£¬ÔÙ¹Ø±Õ */
+		/* å½“å‰æ¨¡å¼ä¸ºåŠ›çŸ©æ¨¡å¼,å…ˆåˆ‡æ¢ä¸ºé€Ÿåº¦æ¨¡å¼ï¼Œå†å…³é—­ */
 		else if(elmo[elmoID].CurOPMode == UM_TCM)
 		{
 			RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_OFF);	
@@ -765,7 +765,7 @@ uint8_t Elmo_Stop(uint8_t elmoID)
 			Elmo_Delay100us_IDx(&elmo[elmoID],200);	
 			Elmo_Delay100us_IDx(&elmo[elmoID],200);			
 
-			/* ¹ã²¥Ä£Ê½ÏÂ£¬ËùÓĞËÙ¶ÈÄ£Ê½¶¼¸ÄÎªSCM */
+			/* å¹¿æ’­æ¨¡å¼ä¸‹ï¼Œæ‰€æœ‰é€Ÿåº¦æ¨¡å¼éƒ½æ”¹ä¸ºSCM */
 			for(i=0;i<=ELMO_NUM;i++) 
 			{
 				elmo[i].CurOPMode = UM_SCM;			
@@ -777,11 +777,11 @@ uint8_t Elmo_Stop(uint8_t elmoID)
 			RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 			Elmo_Delay100us_IDx(&elmo[elmoID],30);
 
-			/* ÉèÖÃÄ¿±êËÙ¶È */
+			/* è®¾ç½®ç›®æ ‡é€Ÿåº¦ */
 			RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"JV", 0, TYPE_INTEGER, 0);
 			Elmo_Delay100us_IDx(&elmo[elmoID],10);
 
-			/* ÔËĞĞËÙ¶ÈÄ£Ê½ */
+			/* è¿è¡Œé€Ÿåº¦æ¨¡å¼ */
 			RPDO2_Cmd_string(&elmo[elmoID], (uint8_t *)"BG");
 			Elmo_Delay100us_IDx(&elmo[elmoID],10);
 		}	
@@ -790,16 +790,16 @@ uint8_t Elmo_Stop(uint8_t elmoID)
 		Elmo_Delay100us_IDx(&elmo[elmoID],10);	
         
     }
-	/* Ê¹ÓÃµ¥¸öELMO¿ØÖÆ */
+	/* ä½¿ç”¨å•ä¸ªELMOæ§åˆ¶ */
 	else    
 	{
-		/* µ±Ç°Ä£Ê½ÎªÊÍ·Åµç»ú,ÏÈ´ò¿ªµç»ú£¬ÔÙ±§ËÀ */		
+		/* å½“å‰æ¨¡å¼ä¸ºé‡Šæ”¾ç”µæœº,å…ˆæ‰“å¼€ç”µæœºï¼Œå†æŠ±æ­» */		
 		if (elmo[elmoID].CurOPMode == UM_IDLE) 
 		{
 			RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 			Elmo_Delay100us_IDx(&elmo[elmoID],30);				
 		}
-		/* µ±Ç°Ä£Ê½ÎªÁ¦¾ØÄ£Ê½,ÏÈÇĞ»»ÎªËÙ¶ÈÄ£Ê½£¬ÔÙ¹Ø±Õ */
+		/* å½“å‰æ¨¡å¼ä¸ºåŠ›çŸ©æ¨¡å¼,å…ˆåˆ‡æ¢ä¸ºé€Ÿåº¦æ¨¡å¼ï¼Œå†å…³é—­ */
 		else if(elmo[elmoID].CurOPMode == UM_TCM)
 		{
 			RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_OFF);	
@@ -825,20 +825,20 @@ uint8_t Elmo_Stop(uint8_t elmoID)
 			RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 			Elmo_Delay100us_IDx(&elmo[elmoID],30);
 
-			/* ÉèÖÃÄ¿±êËÙ¶È */
+			/* è®¾ç½®ç›®æ ‡é€Ÿåº¦ */
 			RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"JV", 0, TYPE_INTEGER, 0);
 			Elmo_Delay100us_IDx(&elmo[elmoID],10);
 
-			/* ÔËĞĞËÙ¶ÈÄ£Ê½ */
+			/* è¿è¡Œé€Ÿåº¦æ¨¡å¼ */
 			RPDO2_Cmd_string(&elmo[elmoID], (uint8_t *)"BG");
 			Elmo_Delay100us_IDx(&elmo[elmoID],10);
 
-            /* Èç¹ûELMOÖ»¹ÒÔØÁË1¸ö£¬²»¹ÜÔõÃ´¸ÄÆäµÄÄ£Ê½£¬elmo[0]µÄÄ£Ê½ºÍËüÒ»Ñù */			
-			for(i=1;i<ELMO_NUM;i++)  //ÓÃÀ´ÅĞ¶ÏÊÇ·ñËùÓĞµç»úÄ£Ê½ÏàÍ¬£¬´Ó¶øÈ·¶¨elmo[0]µÄÄ£Ê½
+            /* å¦‚æœELMOåªæŒ‚è½½äº†1ä¸ªï¼Œä¸ç®¡æ€ä¹ˆæ”¹å…¶çš„æ¨¡å¼ï¼Œelmo[0]çš„æ¨¡å¼å’Œå®ƒä¸€æ · */			
+			for(i=1;i<ELMO_NUM;i++)  //ç”¨æ¥åˆ¤æ–­æ˜¯å¦æ‰€æœ‰ç”µæœºæ¨¡å¼ç›¸åŒï¼Œä»è€Œç¡®å®šelmo[0]çš„æ¨¡å¼
 			{
 				if( elmo[i].CurOPMode == elmo[i+1].CurOPMode )
 				{
-					elmo[0].CurOPMode = UM_SCM;    //Èç¹ûÔÚSTOPÄ£Ê½ÀïÃæµç»úÄ£Ê½Í³Ò»ÁË£¬Ö»ÓĞ¿ÉÄÜÊÇSCMÄ£Ê½
+					elmo[0].CurOPMode = UM_SCM;    //å¦‚æœåœ¨STOPæ¨¡å¼é‡Œé¢ç”µæœºæ¨¡å¼ç»Ÿä¸€äº†ï¼Œåªæœ‰å¯èƒ½æ˜¯SCMæ¨¡å¼
 				}
 				else
 				{
@@ -857,9 +857,9 @@ uint8_t Elmo_Stop(uint8_t elmoID)
 /*
 ********************************************************************************
   *@  name      : Omni_Elmo_Close
-  *@  function  : ÊÍ·Åµ×ÅÌµç»ú
-  *@  input     : ÎŞ
-  *@  output    : ÎŞ
+  *@  function  : é‡Šæ”¾åº•ç›˜ç”µæœº
+  *@  input     : æ— 
+  *@  output    : æ— 
 ********************************************************************************
 */
 void Omni_Elmo_Close()
@@ -874,14 +874,18 @@ void Omni_Elmo_Close()
 //    Elmo_Close(1);
 //    Elmo_Close(2);
 //    Elmo_Close(3);
+    
+    VelX = 0;
+    VelY = 0;
+    VelZ = 0;
 }
 
 /*
 ********************************************************************************
   *@  name      : Omni_Elmo_Stop
-  *@  function  : É²³µ£¬µç»ú±§ËÀ
-  *@  input     : ÎŞ
-  *@  output    : ÎŞ
+  *@  function  : åˆ¹è½¦ï¼Œç”µæœºæŠ±æ­»
+  *@  input     : æ— 
+  *@  output    : æ— 
 ********************************************************************************
 */
 void Omni_Elmo_Stop()
@@ -896,27 +900,31 @@ void Omni_Elmo_Stop()
 //    Elmo_Stop(1);
 //    Elmo_Stop(2);
 //    Elmo_Stop(3);
+    
+    VelX = 0;
+    VelY = 0;
+    VelZ = 0;
 }
 
 /*
 ********************************************************************************
   *@  name      : Omni_Elmo_PVM
-  *@  function  : ÈıÂÖËÙ¶ÈÄ£Ê½º¯Êı
-  *@  input     : ÎŞ
-  *@  output    : ÎŞ
+  *@  function  : ä¸‰è½®é€Ÿåº¦æ¨¡å¼å‡½æ•°
+  *@  input     : æ— 
+  *@  output    : æ— 
 ********************************************************************************
 */
 void Omni_Elmo_PVM()
 {
-	/* ÉèÖÃÄ¿±êËÙ¶È */
-	RPDO2_Cmd_data(&elmo[1], (uint8_t *)"JV", 0, TYPE_INTEGER, Real2Elmo_Head);
-	RPDO2_Cmd_data(&elmo[2], (uint8_t *)"JV", 0, TYPE_INTEGER, Real2Elmo_Left);
-	RPDO2_Cmd_data(&elmo[3], (uint8_t *)"JV", 0, TYPE_INTEGER, Real2Elmo_Right);
+	/* è®¾ç½®ç›®æ ‡é€Ÿåº¦ */
+	RPDO2_Cmd_data(&elmo[1], (uint8_t *)"JV", 0, TYPE_INTEGER, Real2ElmoHead);
+	RPDO2_Cmd_data(&elmo[2], (uint8_t *)"JV", 0, TYPE_INTEGER, Real2ElmoLeft);
+	RPDO2_Cmd_data(&elmo[3], (uint8_t *)"JV", 0, TYPE_INTEGER, Real2ElmoRight);
 	Elmo_Delay100us_IDx(&elmo[1],10);
 	Elmo_Delay100us_IDx(&elmo[2],10);
 	Elmo_Delay100us_IDx(&elmo[3],10);
 
-	/* ÔËĞĞËÙ¶ÈÄ£Ê½ */
+	/* è¿è¡Œé€Ÿåº¦æ¨¡å¼ */
 	RPDO2_Cmd_string(&elmo[1], (uint8_t *)"BG");
 	RPDO2_Cmd_string(&elmo[2], (uint8_t *)"BG");
 	RPDO2_Cmd_string(&elmo[3], (uint8_t *)"BG");
@@ -924,20 +932,20 @@ void Omni_Elmo_PVM()
 	Elmo_Delay100us_IDx(&elmo[2],20);
 	Elmo_Delay100us_IDx(&elmo[3],20);
     
-//    Elmo_PVM(1, Real2Elmo_Head);
-//    Elmo_PVM(2, Real2Elmo_Left);
-//    Elmo_PVM(3, Real2Elmo_Right);
+//    Elmo_PVM(1, Real2ElmoHead);
+//    Elmo_PVM(2, Real2ElmoLeft);
+//    Elmo_PVM(3, Real2ElmoRight);
 }
 
 /*
 ********************************************************************************
   *@  name      : Elmo_SetAcc(uint8_t elmoID, uint32_t acc, uint32_t dec)
-  *@  function  : ÉèÖÃËÙ¶ÈÄ£Ê½ºÍÎ»ÖÃÄ£Ê½µÄµç»ú¼Ó¼õËÙ
-  *@  input     : elmoID     È¡elmoµÄ½ÚµãID
-  *@                 acc        ¼ÓËÙ¶È,¼ÓËÙ¶È×î´ó²»ÄÜ³¬¹ı1000000000,Í¬Ê±Ó¦¿¼ÂÇµç»úĞÔÄÜ
-  *@                 dec        ¼õËÙ¶È,¼õËÙ¶È×î´ó²»ÄÜ³¬¹ı1000000000,Í¬Ê±Ó¦¿¼ÂÇµç»úĞÔÄÜ
-  *@  output    : 0         º¯Êıµ÷ÓÃ³É¹¦
-  *@              1         º¯Êıµ÷ÓÃÊ§°Ü
+  *@  function  : è®¾ç½®é€Ÿåº¦æ¨¡å¼å’Œä½ç½®æ¨¡å¼çš„ç”µæœºåŠ å‡é€Ÿ
+  *@  input     : elmoID     å–elmoçš„èŠ‚ç‚¹ID
+  *@                 acc        åŠ é€Ÿåº¦,åŠ é€Ÿåº¦æœ€å¤§ä¸èƒ½è¶…è¿‡1000000000,åŒæ—¶åº”è€ƒè™‘ç”µæœºæ€§èƒ½
+  *@                 dec        å‡é€Ÿåº¦,å‡é€Ÿåº¦æœ€å¤§ä¸èƒ½è¶…è¿‡1000000000,åŒæ—¶åº”è€ƒè™‘ç”µæœºæ€§èƒ½
+  *@  output    : 0         å‡½æ•°è°ƒç”¨æˆåŠŸ
+  *@              1         å‡½æ•°è°ƒç”¨å¤±è´¥
 ********************************************************************************
 */
 uint8_t Elmo_SetAcc(uint8_t elmoID, uint32_t acc, uint32_t dec)
@@ -959,9 +967,9 @@ uint8_t Elmo_SetAcc(uint8_t elmoID, uint32_t acc, uint32_t dec)
 /*
 ********************************************************************************
   *@  name      : NMTCmd
-  *@  function  : ¶ÔÓÚCANOPENµÄNMT×´Ì¬ÉèÖÃ
-  *@  input     : elmo     È¡elmoµÄ½ÚµãID
-                  MNTCmd   NMTÖ¸Áî,NMT_xxx
+  *@  function  : å¯¹äºCANOPENçš„NMTçŠ¶æ€è®¾ç½®
+  *@  input     : elmo     å–elmoçš„èŠ‚ç‚¹ID
+                  MNTCmd   NMTæŒ‡ä»¤,NMT_xxx
   *@  output    : None
 ********************************************************************************
 */
@@ -1027,16 +1035,16 @@ static void NMTCmd(Elmo *elmo, uint8_t MNTCmd)
 	}
 	if(tmp_rear == QUEUE_CAN_IDx->Front)
 	{
-		/* »º³åÇøÒÑÂú */
+		/* ç¼“å†²åŒºå·²æ»¡ */
 		return;
 	}
-		/* Ìî³ä»º³åÇø */
+		/* å¡«å……ç¼“å†²åŒº */
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].COBID   =  COBID_NMT_SERVICE;
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DLC     =  2;
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[0] =  MNTCmd;
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[1] =  elmo->NodeID;
 
-	/* ÓĞĞ§Êı¾İ¼Ó1 */
+	/* æœ‰æ•ˆæ•°æ®åŠ 1 */
 	QUEUE_CAN_IDx->Rear++;
 	if(QUEUE_CAN_IDx->Rear >= CAN_BUF_NUM)
 	{
@@ -1048,11 +1056,11 @@ static void NMTCmd(Elmo *elmo, uint8_t MNTCmd)
 /*
 ********************************************************************************
   *@  name      : RSDO
-  *@  function  : Ê¹ÓÃÏÂÔØSDO½øĞĞÖ¸Áî·¢ËÍ
-  *@  input     : elmo      È¡elmo½ÚµãID
-									Index     Ë÷Òı
-                  SubIndex  ×ÓË÷Òı
-                  Data      Êı¾İ
+  *@  function  : ä½¿ç”¨ä¸‹è½½SDOè¿›è¡ŒæŒ‡ä»¤å‘é€
+  *@  input     : elmo      å–elmoèŠ‚ç‚¹ID
+									Index     ç´¢å¼•
+                  SubIndex  å­ç´¢å¼•
+                  Data      æ•°æ®
   *@  output    : None
 ********************************************************************************
 */
@@ -1118,13 +1126,13 @@ static void RSDO(Elmo *elmo, uint16_t Index, uint8_t SubIndex, uint32_t Data)
 	}
 	if(tmp_rear == QUEUE_CAN_IDx->Front)
 	{
-		/* »º³åÇøÒÑÂú */
+		/* ç¼“å†²åŒºå·²æ»¡ */
 		return;
 	}
-	/* Ìî³ä»º³åÇø */
+	/* å¡«å……ç¼“å†²åŒº */
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].COBID   = COBID_RSDO + elmo->NodeID;  // COBID
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DLC     = 8;                          // DLC
-	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[0] =  0x22;                       // CS,´«ÊäÁ¿Î´È·ÈÏ
+	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[0] =  0x22;                       // CS,ä¼ è¾“é‡æœªç¡®è®¤
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[1] = (Index&0xFF);               // Index
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[2] = (Index&0xFF00)>>8;
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[3] = (SubIndex);                 // SubIndex
@@ -1133,7 +1141,7 @@ static void RSDO(Elmo *elmo, uint16_t Index, uint8_t SubIndex, uint32_t Data)
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[6] = (Data&0xFF0000)>>16;
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[7] = (Data&0xFF000000)>>24;
 
-	/* ÓĞĞ§Êı¾İ¼Ó1 */
+	/* æœ‰æ•ˆæ•°æ®åŠ 1 */
 	QUEUE_CAN_IDx->Rear++;
 	if(QUEUE_CAN_IDx->Rear >= CAN_BUF_NUM)
 	{
@@ -1145,13 +1153,13 @@ static void RSDO(Elmo *elmo, uint16_t Index, uint8_t SubIndex, uint32_t Data)
 /*
 ********************************************************************************
   *@  name      : RPDO2_Cmd_data
-  *@  function  : Ê¹ÓÃ¶ş½øÖÆ±àÂë¶ÔELMO·¢ËÍÊı¾İÖ¸Áî
-                  CANopen RPDO2 -> 0x2012 ¶ş½øÖÆÊäÈë-ÉèÖÃ¹¦ÄÜ
-  *@  input     : elmo   È¡elmo½ÚµãID
-                  Cmd    ÃüÁî,ÒÔ×Ö·û´®ĞÎÊ½ÊäÈë
-                  Index  ÃüÁîµÄÏÂ±ê           
-                  Type   Êı¾İÀàĞÍ
-                  Data   Êı¾İ
+  *@  function  : ä½¿ç”¨äºŒè¿›åˆ¶ç¼–ç å¯¹ELMOå‘é€æ•°æ®æŒ‡ä»¤
+                  CANopen RPDO2 -> 0x2012 äºŒè¿›åˆ¶è¾“å…¥-è®¾ç½®åŠŸèƒ½
+  *@  input     : elmo   å–elmoèŠ‚ç‚¹ID
+                  Cmd    å‘½ä»¤,ä»¥å­—ç¬¦ä¸²å½¢å¼è¾“å…¥
+                  Index  å‘½ä»¤çš„ä¸‹æ ‡           
+                  Type   æ•°æ®ç±»å‹
+                  Data   æ•°æ®
   *@  output    : None
 ********************************************************************************
 */
@@ -1216,10 +1224,10 @@ static void RPDO2_Cmd_data(Elmo *elmo, uint8_t *Cmd, uint8_t Index, uint8_t Type
 	}
 	if(tmp_rear == QUEUE_CAN_IDx->Front)
 	{
-		/* »º³åÇøÒÑÂú */
+		/* ç¼“å†²åŒºå·²æ»¡ */
 		return;
 	}
-	/* Ìî³ä»º³åÇø */
+	/* å¡«å……ç¼“å†²åŒº */
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].COBID   = COBID_RPDO2 + elmo->NodeID;
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DLC     = 8;
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[0] = (*Cmd++);
@@ -1231,7 +1239,7 @@ static void RPDO2_Cmd_data(Elmo *elmo, uint8_t *Cmd, uint8_t Index, uint8_t Type
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[6] = (Data&0xFF0000)>>16;
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[7] = (Data&0xFF000000)>>24;
 
-	/* ÓĞĞ§Êı¾İ¼Ó1 */
+	/* æœ‰æ•ˆæ•°æ®åŠ 1 */
 	QUEUE_CAN_IDx->Rear++;
 	if(QUEUE_CAN_IDx->Rear >= CAN_BUF_NUM)
 	{
@@ -1243,10 +1251,10 @@ static void RPDO2_Cmd_data(Elmo *elmo, uint8_t *Cmd, uint8_t Index, uint8_t Type
 /*
 ********************************************************************************
   *@  name      : RPDO2_Cmd_string
-  *@  function  : Ê¹ÓÃ¶ş½øÖÆ±àÂë¶ÔELMO·¢ËÍ×Ö·û´®Ö¸Áî
-                  CANopen RPDO2 -> 0x2012 ¶ş½øÖÆÊäÈë-Ö´ĞĞ¹¦ÄÜ
-  *@  input     : elmo   È¡elmo½ÚµãID
-									cmd    ÃüÁî,ÒÔ×Ö·û´®ĞÎÊ½ÊäÈë
+  *@  function  : ä½¿ç”¨äºŒè¿›åˆ¶ç¼–ç å¯¹ELMOå‘é€å­—ç¬¦ä¸²æŒ‡ä»¤
+                  CANopen RPDO2 -> 0x2012 äºŒè¿›åˆ¶è¾“å…¥-æ‰§è¡ŒåŠŸèƒ½
+  *@  input     : elmo   å–elmoèŠ‚ç‚¹ID
+									cmd    å‘½ä»¤,ä»¥å­—ç¬¦ä¸²å½¢å¼è¾“å…¥
   *@  output    : None
 ********************************************************************************
 */
@@ -1312,11 +1320,11 @@ static void RPDO2_Cmd_string(Elmo *elmo, uint8_t *Cmd)
 	}
 	if(tmp_rear == QUEUE_CAN_IDx->Front)
 	{
-		/* »º³åÇøÒÑÂú */
+		/* ç¼“å†²åŒºå·²æ»¡ */
 		return;
 	}
 
-	/* Ìî³ä»º³åÇø */
+	/* å¡«å……ç¼“å†²åŒº */
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].COBID   = COBID_RPDO2 + elmo->NodeID;
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DLC     = 4;
 	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[0] = (*Cmd++);
@@ -1353,7 +1361,7 @@ static void RPDO2_Cmd_string(Elmo *elmo, uint8_t *Cmd)
 
 //	if( CANx == CAN1 )
 //	{  
-//		can = CAN1;				//Îªµ×²ã·¢ËÍ±¨ÎÄÑ¡Ôñcan¿Ú
+//		can = CAN1;				//ä¸ºåº•å±‚å‘é€æŠ¥æ–‡é€‰æ‹©canå£
 //		/* Enable GPIO clock */
 //		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 
@@ -1373,7 +1381,7 @@ static void RPDO2_Cmd_string(Elmo *elmo, uint8_t *Cmd)
 //	}
 //	else if( CANx == CAN2 )
 //	{  
-//		can = CAN2;				//Îªµ×²ã·¢ËÍ±¨ÎÄÑ¡Ôñcan¿Ú
+//		can = CAN2;				//ä¸ºåº•å±‚å‘é€æŠ¥æ–‡é€‰æ‹©canå£
 //		/* Enable GPIO clock */
 //		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
 
@@ -1409,7 +1417,7 @@ static void RPDO2_Cmd_string(Elmo *elmo, uint8_t *Cmd)
 //	/* Baudrate = 1Mbps (CAN clocked at 42 MHz) */
 //	CAN_InitStructure.CAN_BS1 = CAN_BS1_9tq;
 //	CAN_InitStructure.CAN_BS2 = CAN_BS2_4tq;
-//	CAN_InitStructure.CAN_Prescaler = 3;     //CAN²¨ÌØÂÊ42/(1+9+4)/3=1Mbps
+//	CAN_InitStructure.CAN_Prescaler = 3;     //CANæ³¢ç‰¹ç‡42/(1+9+4)/3=1Mbps
 //	CAN_Init(CANx, &CAN_InitStructure);
 
 //	/* CAN filter init */
@@ -1424,7 +1432,7 @@ static void RPDO2_Cmd_string(Elmo *elmo, uint8_t *Cmd)
 //	CAN_FilterInitStructure.CAN_FilterActivation = ENABLE;
 //	CAN_FilterInit(&CAN_FilterInitStructure);
 
-//	if( CANx == CAN1 )//ÓÃÀ´×Ô¼ì
+//	if( CANx == CAN1 )//ç”¨æ¥è‡ªæ£€
 //	{  
 //		/* CAN FIFO0 message pending interrupt enable */ 
 //		CAN_ITConfig(CAN1,CAN_IT_FMP0, ENABLE);
@@ -1454,7 +1462,7 @@ static void RPDO2_Cmd_string(Elmo *elmo, uint8_t *Cmd)
 /*
 ********************************************************************************
   *@  name      : CAN1_RX0_IRQHandler & CAN2_RX0_IRQHandler
-  *@  function  : CANÖĞ¶Ï´¦Àíº¯Êı
+  *@  function  : CANä¸­æ–­å¤„ç†å‡½æ•°
   *@  input     : None
   *@  output    : None
 ********************************************************************************
@@ -1468,7 +1476,7 @@ static void RPDO2_Cmd_string(Elmo *elmo, uint8_t *Cmd)
 /*
 ********************************************************************************
   *@  name      : TIM7_init
-  *@  function  : TIM7³õÊ¼»¯£¬Ê¹CAN±¨ÎÄÃ¿100us·¢ËÍÒ»´Î
+  *@  function  : TIM7åˆå§‹åŒ–ï¼Œä½¿CANæŠ¥æ–‡æ¯100uså‘é€ä¸€æ¬¡
   *@  input     : None
   *@  output    : None
 ********************************************************************************
@@ -1509,7 +1517,7 @@ static void TIM7_init(uint8_t PPr, uint8_t SPr)
 /*
 ********************************************************************************
   *@  name      : TIM7_IRQHandler
-  *@  function  : TIM7ÖĞ¶Ï´¦Àíº¯Êı£¬Ã¿100usÓÃÀ´·¢ËÍCAN±¨ÎÄ
+  *@  function  : TIM7ä¸­æ–­å¤„ç†å‡½æ•°ï¼Œæ¯100usç”¨æ¥å‘é€CANæŠ¥æ–‡
   *@  input     : None
   *@  output    : None
 ********************************************************************************
@@ -1530,7 +1538,7 @@ void TIM7_IRQHandler(void)
 /*
 ********************************************************************************
   *@  name      : Self_test
-  *@  function  : ElmoÉÏµç×Ô¼ì
+  *@  function  : Elmoä¸Šç”µè‡ªæ£€
   *@  input     : None
   *@  output    : None
 ********************************************************************************
@@ -1544,7 +1552,7 @@ int Self_test(void)
 	   __nop();
 	}
     while( --cnt_delay );
-    if( CAN_Error == 1) //Èç¹û³õÊ¼»¯Ê§°Ü£¬¹Ø±ÕTIM7µÄÖĞ¶ÏºÍTIM7
+    if( CAN_Error == 1) //å¦‚æœåˆå§‹åŒ–å¤±è´¥ï¼Œå…³é—­TIM7çš„ä¸­æ–­å’ŒTIM7
 	{
 		TIM_ITConfig(TIM7, TIM_IT_Update, DISABLE);
 		TIM_Cmd(TIM7, DISABLE);		
@@ -1555,7 +1563,7 @@ int Self_test(void)
 	
     while((Elmo_Init_Flag & ((1<<ELMO_NUM) - 1)) != ((1<<ELMO_NUM) - 1))
     {
-	   //canopenÉè±¸ÉÏÏßÖ®ºó»á·¢ËÍ±¨ÎÄ£¬±¨ÎÄºÍĞÄÌø±¨ÎÄÒ»Ñù£¬¿ÉÒÔ¼ì²âÉè±¸ÓĞÎŞÉÏÏß¡£
+	   //canopenè®¾å¤‡ä¸Šçº¿ä¹‹åä¼šå‘é€æŠ¥æ–‡ï¼ŒæŠ¥æ–‡å’Œå¿ƒè·³æŠ¥æ–‡ä¸€æ ·ï¼Œå¯ä»¥æ£€æµ‹è®¾å¤‡æœ‰æ— ä¸Šçº¿ã€‚
 	  	return Elmo_Init_Flag;
     }
 //	CAN_ITConfig(CAN1,CAN_IT_FMP0, DISABLE);
@@ -1568,7 +1576,7 @@ int Self_test(void)
 /*
 ********************************************************************************
   *@  name      : Variate_init
-  *@  function  : ²ÎÊı³õÊ¼»¯
+  *@  function  : å‚æ•°åˆå§‹åŒ–
   *@  input     : None
   *@  output    : None
 ********************************************************************************
@@ -1634,14 +1642,18 @@ static void Variate_init(void)
 	#ifdef ID_15
 	    Variate_init_QUEUE_CAN_IDx(&QUEUE_CAN_ID15);
 	#endif
+    
+    VelX = 0;
+    VelY = 0;
+    VelZ = 0;
 }
 
 
 /*
 ********************************************************************************
   *@  name      : Elmo_SendCmd_QUEUE_CAN_IDx
-  *@  function  : ·¢ËÍÃüÁî£¬ÓĞ¿ÉÄÜÊÇCAN±¨ÎÄ£¬Ò²ÓĞ¿ÉÄÜÊÇÑÓ³Ù±¨ÎÄ
-  *@  input     : CANQUEUE *QUEUE_CAN_IDx Òª·¢ËÍµÄ»º³åÇø
+  *@  function  : å‘é€å‘½ä»¤ï¼Œæœ‰å¯èƒ½æ˜¯CANæŠ¥æ–‡ï¼Œä¹Ÿæœ‰å¯èƒ½æ˜¯å»¶è¿ŸæŠ¥æ–‡
+  *@  input     : CANQUEUE *QUEUE_CAN_IDx è¦å‘é€çš„ç¼“å†²åŒº
   *@  output    : None
 ********************************************************************************
 */
@@ -1652,23 +1664,23 @@ extern uint8_t TIM7_OSTimeSave_Enable;
 uint16_t TIM7_OSTime_Count=0;
 uint16_t TIM7_OSTime_Count_ten=0;
 
-void Elmo_SendCmd_QUEUE_CAN_IDx(CANQUEUE *QUEUE_CAN_IDx)   //·¢ËÍÖ¸ÕëÖ¸ÏòµÄ»º³åÇøµÄÊı¾İ
+void Elmo_SendCmd_QUEUE_CAN_IDx(CANQUEUE *QUEUE_CAN_IDx)   //å‘é€æŒ‡é’ˆæŒ‡å‘çš„ç¼“å†²åŒºçš„æ•°æ®
 {
- 	/* ÅĞ¶Ï»º³åÇøÊÇ·ñÓĞÊı¾İ */
+ 	/* åˆ¤æ–­ç¼“å†²åŒºæ˜¯å¦æœ‰æ•°æ® */
 	if(QUEUE_CAN_IDx->Rear != QUEUE_CAN_IDx->Front)
 	{		
-		/* ÓĞÊı¾İ,ÅĞ¶ÏÊÇ·ñÊÇÑÓÊ±ÃüÁî */
+		/* æœ‰æ•°æ®,åˆ¤æ–­æ˜¯å¦æ˜¯å»¶æ—¶å‘½ä»¤ */
 		if(QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Front].COBID == CAN_ID_DELAY)
 		{
-			/* ÊÇÑÓÊ±Ö¸Áî,ÅĞ¶ÏÊÇ·ñÑÓÊ±Íê±Ï */
-			if(QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Front].DATA[0] > 1) //·¢ÏÖÒ»¸öBUG£¬¸ÄÁËĞ§¹ûºÃºÜ¶à
+			/* æ˜¯å»¶æ—¶æŒ‡ä»¤,åˆ¤æ–­æ˜¯å¦å»¶æ—¶å®Œæ¯• */
+			if(QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Front].DATA[0] > 1) //å‘ç°ä¸€ä¸ªBUGï¼Œæ”¹äº†æ•ˆæœå¥½å¾ˆå¤š
 			{
-				/* ÑÓÊ±Î´Íê,ÑÓÊ±Ê±¼ä¼õ1 */
+				/* å»¶æ—¶æœªå®Œ,å»¶æ—¶æ—¶é—´å‡1 */
 				QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Front].DATA[0]--;
 			}
 			else
 			{
-				/* ÑÓÊ±Íê±Ï,¶ÓÊ×¼Ó1 */      
+				/* å»¶æ—¶å®Œæ¯•,é˜Ÿé¦–åŠ 1 */      
 				QUEUE_CAN_IDx->Front++;
 				if( QUEUE_CAN_IDx->Front >= CAN_BUF_NUM)
 				{
@@ -1678,10 +1690,10 @@ void Elmo_SendCmd_QUEUE_CAN_IDx(CANQUEUE *QUEUE_CAN_IDx)   //·¢ËÍÖ¸ÕëÖ¸ÏòµÄ»º³åÇ
 		}
 		else
 		{
-			/* ²»ÊÇÑÓÊ±Ö¸Áî,·¢ËÍCAN±¨ÎÄ */
+			/* ä¸æ˜¯å»¶æ—¶æŒ‡ä»¤,å‘é€CANæŠ¥æ–‡ */
 			Elmo_CANSend( &QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Front] );
 
-			/*¶ÓÊ×¼Ó1*/   
+			/*é˜Ÿé¦–åŠ 1*/   
 			QUEUE_CAN_IDx->Front++;
 			if( QUEUE_CAN_IDx->Front >= CAN_BUF_NUM)
 			{
@@ -1691,7 +1703,7 @@ void Elmo_SendCmd_QUEUE_CAN_IDx(CANQUEUE *QUEUE_CAN_IDx)   //·¢ËÍÖ¸ÕëÖ¸ÏòµÄ»º³åÇ
 	}
 	else
 	{
-		/* ¶ÓÁĞÎª¿Õ */ 
+		/* é˜Ÿåˆ—ä¸ºç©º */ 
 		return;   
 	}
 
@@ -1701,7 +1713,7 @@ void Elmo_SendCmd_QUEUE_CAN_IDx(CANQUEUE *QUEUE_CAN_IDx)   //·¢ËÍÖ¸ÕëÖ¸ÏòµÄ»º³åÇ
 /*
 ********************************************************************************
   *@  name      : Elmo_SendCmd
-  *@  function  : ·¢ËÍÃüÁî£¬ÓĞ¿ÉÄÜÊÇCAN±¨ÎÄ£¬Ò²ÓĞ¿ÉÄÜÊÇÑÓ³Ù±¨ÎÄ
+  *@  function  : å‘é€å‘½ä»¤ï¼Œæœ‰å¯èƒ½æ˜¯CANæŠ¥æ–‡ï¼Œä¹Ÿæœ‰å¯èƒ½æ˜¯å»¶è¿ŸæŠ¥æ–‡
   *@  input     : None
   *@  output    : None
 ********************************************************************************
@@ -1765,7 +1777,7 @@ static void Elmo_SendCmd(void)
 /*
 ********************************************************************************
   *@  name      : Elmo_CANSend
-  *@  function  : µ×²ã·¢ËÍCAN±¨ÎÄ
+  *@  function  : åº•å±‚å‘é€CANæŠ¥æ–‡
   *@  input     : None
   *@  output    : None
 ********************************************************************************
@@ -1776,15 +1788,15 @@ static void Elmo_CANSend(CANDATA *pCANDATA)
 	uint32_t cnt_delay;
 	CanTxMsg elmoCAN;
 
-	elmoCAN.IDE    =  CAN_ID_STD;                          // ±ê×¼Ö¡
-	elmoCAN.RTR    =  CAN_RTR_DATA;                        // Êı¾İÖ¡
+	elmoCAN.IDE    =  CAN_ID_STD;                          // æ ‡å‡†å¸§
+	elmoCAN.RTR    =  CAN_RTR_DATA;                        // æ•°æ®å¸§
 	elmoCAN.StdId  =  pCANDATA->COBID;                     // COBID
 	elmoCAN.DLC    =  pCANDATA->DLC;                       // DLC
 	for(i=0;i<elmoCAN.DLC;i++)                             // Data
 	{
 		elmoCAN.Data[i] = pCANDATA->DATA[i];		
 	}
-	TransmitMailbox = CAN_Transmit(can, &elmoCAN);                          // µ÷ÓÃ·¢ËÍ±¨ÎÄº¯Êı   
+	TransmitMailbox = CAN_Transmit(can, &elmoCAN);                          // è°ƒç”¨å‘é€æŠ¥æ–‡å‡½æ•°   
 	
 	cnt_delay = 0x2FFF;
 	do
@@ -1803,8 +1815,8 @@ static void Elmo_CANSend(CANDATA *pCANDATA)
 /*
 ********************************************************************************
   *@  name      : Elmo_Delay100us_IDx
-  *@  function  : ÑÓ³Ù±¨ÎÄÓÃÀ´ÑÓ³ÙÏÂÒ»¸ö±¨ÎÄµÄ·¢ËÍ£¬Ìá¸ß·¢ËÍ±¨ÎÄµÄÎÈ¶¨ĞÔ
-                  N×î´óÎª255£¨N´Î100us£©
+  *@  function  : å»¶è¿ŸæŠ¥æ–‡ç”¨æ¥å»¶è¿Ÿä¸‹ä¸€ä¸ªæŠ¥æ–‡çš„å‘é€ï¼Œæé«˜å‘é€æŠ¥æ–‡çš„ç¨³å®šæ€§
+                  Næœ€å¤§ä¸º255ï¼ˆNæ¬¡100usï¼‰
   *@  input     : None
   *@  output    : None
 ********************************************************************************
@@ -1864,7 +1876,7 @@ static void Elmo_Delay100us_IDx( Elmo *elmo , uint8_t N100us)
 		#endif
 	}
 	
-	/* ÅĞ¶Ï»º³åÇøÊÇ·ñÒÑÂú */
+	/* åˆ¤æ–­ç¼“å†²åŒºæ˜¯å¦å·²æ»¡ */
 	tmp_rear = QUEUE_CAN_IDx->Rear + 1;
 	if(tmp_rear >= CAN_BUF_NUM)
 	{
@@ -1872,16 +1884,16 @@ static void Elmo_Delay100us_IDx( Elmo *elmo , uint8_t N100us)
 	}
 	if(tmp_rear == QUEUE_CAN_IDx->Rear)
 	{
-		/* »º³åÇøÒÑÂú */
+		/* ç¼“å†²åŒºå·²æ»¡ */
 		return ;
 	}
 
-	/* Ìî³ä»º³åÇø */
-	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].COBID   = CAN_ID_DELAY;        // ÑÓÊ±ÓÃµÄCOBID 
-	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DLC     = 1;                   // DLCÎª1r 
-	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[0] = N100us;              // ÑÓÊ±,¼ÇÂ¼Ê±³¤ 
+	/* å¡«å……ç¼“å†²åŒº */
+	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].COBID   = CAN_ID_DELAY;        // å»¶æ—¶ç”¨çš„COBID 
+	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DLC     = 1;                   // DLCä¸º1r 
+	QUEUE_CAN_IDx->CANBUF[QUEUE_CAN_IDx->Rear].DATA[0] = N100us;              // å»¶æ—¶,è®°å½•æ—¶é•¿ 
 
-	/* ÓĞĞ§Êı¾İ¼Ó1 */
+	/* æœ‰æ•ˆæ•°æ®åŠ 1 */
 	QUEUE_CAN_IDx->Rear++;
 	if(QUEUE_CAN_IDx->Rear >= CAN_BUF_NUM)
 	{
@@ -1893,7 +1905,7 @@ static void Elmo_Delay100us_IDx( Elmo *elmo , uint8_t N100us)
 /*
 ********************************************************************************
   *@  name      : Elmo_software_delay_ms
-  *@  function  : ElmoÈí¼şÑÓÊ±
+  *@  function  : Elmoè½¯ä»¶å»¶æ—¶
   *@  input     : None
   *@  output    : None
 ********************************************************************************
@@ -1912,8 +1924,8 @@ void Elmo_software_delay_ms(unsigned int t)
 /*
 ********************************************************************************
   *@  name      : f2h
-  *@  function  : ½«¸¡µãÊı×ª»¯Îª8×Ö½ÚÊ®Áù½øÖÆÊı(IEEE754)
-  *@  input     : x   ¸¡µãÊı 
+  *@  function  : å°†æµ®ç‚¹æ•°è½¬åŒ–ä¸º8å­—èŠ‚åå…­è¿›åˆ¶æ•°(IEEE754)
+  *@  input     : x   æµ®ç‚¹æ•° 
   *@  output    : None
 ********************************************************************************
 */
@@ -1925,21 +1937,21 @@ static uint32_t f2h(float x)
 /*
 ********************************************************************************
   *@  name      : Elmo_Read_POS
-  *@  function  : ¶ÁÈ¡¶ÔÓ¦µÄelmoµÄ±àÂëÆ÷µÄÊı¾İ
-  *@  input     : elmoID   ÎŞ·ûºÅ8Î»Êı¾İ 
+  *@  function  : è¯»å–å¯¹åº”çš„elmoçš„ç¼–ç å™¨çš„æ•°æ®
+  *@  input     : elmoID   æ— ç¬¦å·8ä½æ•°æ® 
   *@  output    : None
 ********************************************************************************
 */
 void Elmo_Read_POS(uint8_t elmoID)
 {
 	
-	//¿ªÆôTPDO2
+	//å¼€å¯TPDO2
     RSDO(&elmo[elmoID], 0x1A01, 0x00,1);
 	Elmo_Delay100us_IDx(&elmo[elmoID],50);
-    //¶ÁÈ¡elmo±àÂëÆ÷µÄÊıÖµ
+    //è¯»å–elmoç¼–ç å™¨çš„æ•°å€¼
     RPDO2_Cmd_string(&elmo[elmoID], (uint8_t *)"PX");
     Elmo_Delay100us_IDx(&elmo[elmoID],20);
-    //¹Ø±ÕTPDO2
+    //å…³é—­TPDO2
     RSDO(&elmo[elmoID], 0x1A01, 0x00,0);
 	Elmo_Delay100us_IDx(&elmo[elmoID],50);
 	
@@ -1948,32 +1960,32 @@ void Elmo_Read_POS(uint8_t elmoID)
 }
 
 /**
-  * @brief  Elmo_Read_POS,¶ÁÈ¡¶ÔÓ¦µÄelmoµÄ±àÂëÆ÷µÄÊı¾İ
-  * @param  elmoID   ÎŞ·ûºÅ8Î»Êı¾İ
-  *         pEncData int32_t ĞÍÖ¸Õë£¬Ö¸Ïò·µ»ØÊı¾İ
-  * @retval 0   £º³É¹¦
-  *         1   £ºÊ§°Ü
+  * @brief  Elmo_Read_POS,è¯»å–å¯¹åº”çš„elmoçš„ç¼–ç å™¨çš„æ•°æ®
+  * @param  elmoID   æ— ç¬¦å·8ä½æ•°æ®
+  *         pEncData int32_t å‹æŒ‡é’ˆï¼ŒæŒ‡å‘è¿”å›æ•°æ®
+  * @retval 0   ï¼šæˆåŠŸ
+  *         1   ï¼šå¤±è´¥
   * @time   RSDORead
-  *         -   1ms¼ä¸ôÁ¬Ğø·¢ËÍ1000´Î£¬×î´ó¶ÁÈ¡(·¢ËÍÍêÃüÁîÖÁ½ÓÊÕµ½Êı¾İ)Ê±¼äÎ´³¬¹ı 80000/84us = 952.38us
-  *         -   ´Ë´¦µÈ´ı1.5ms
-  * @note   ÖĞ¶ÏÖĞ¶ÁÈ¡
+  *         -   1msé—´éš”è¿ç»­å‘é€1000æ¬¡ï¼Œæœ€å¤§è¯»å–(å‘é€å®Œå‘½ä»¤è‡³æ¥æ”¶åˆ°æ•°æ®)æ—¶é—´æœªè¶…è¿‡ 80000/84us = 952.38us
+  *         -   æ­¤å¤„ç­‰å¾…1.5ms
+  * @note   ä¸­æ–­ä¸­è¯»å–
   *         RxMsg.StdId == COBID_TSDO + ID;
   *         if ((RxMsg.Data[2]<<8 | RxMsg.Data[1]) == 0x6064)
   *             memcpy(&Encoder_Data, &RxMsg.Data[4],sizeof(int32_t));
-  *         Ä¿Ç°½öÖ§³Ö ID£ºMOTOR_ID_HIT_MAIN£¬MOTOR_ID_HIT_SERVE £¡£¡£¡
+  *         ç›®å‰ä»…æ”¯æŒ IDï¼šMOTOR_ID_HIT_MAINï¼ŒMOTOR_ID_HIT_SERVE ï¼ï¼ï¼
   */
 //uint32_t readElmo_Pos(uint8_t elmoID, int32_t *pEncData)
 //{
 //    uint32_t err = 1;
-//    /* ÏÖÔÚÊ¼ÖÕ¿ªÆôCAN1½ÓÊÕÖĞ¶Ï£¬¹Ê²»±ØÔÙ¿ªÆôCAN1½ÓÊÕÖĞ¶Ï */
+//    /* ç°åœ¨å§‹ç»ˆå¼€å¯CAN1æ¥æ”¶ä¸­æ–­ï¼Œæ•…ä¸å¿…å†å¼€å¯CAN1æ¥æ”¶ä¸­æ–­ */
 //    //CAN1->IER |= CAN_IT_FMP0;
 
-//    /* ¶ÁÈ¡elmo±àÂëÆ÷µÄÊıÖµ */
+//    /* è¯»å–elmoç¼–ç å™¨çš„æ•°å€¼ */
 //    Elmo_Read_POS(elmoID);
 //    
 ////    if(elmoID == MOTOR_ID_ARM_X)
 ////    {
-////        if(xSemaphoreTake(PosArmXSem, 3*portTICK_MS) == pdTRUE)   //1.5ms  CANÏß×èÈû
+////        if(xSemaphoreTake(PosArmXSem, 3*portTICK_MS) == pdTRUE)   //1.5ms  CANçº¿é˜»å¡
 ////        {
 ////            *pEncData = EncoderData_1;
 ////            err = 0;
@@ -1992,32 +2004,32 @@ void Elmo_Read_POS(uint8_t elmoID)
 ////            err = 1;
 ////    }
 //    
-//    /* ¹Ø±ÕCAN1½ÓÊÕÖĞ¶Ï */
+//    /* å…³é—­CAN1æ¥æ”¶ä¸­æ–­ */
 //    //CAN1->IER &= ~CAN_IT_FMP0;
 //    return err;
 //}
 /*
 ********************************************************************************
   *@  name      : Elmo_Set_POS
-  *@  function  : ¶ÁÈ¡¶ÔÓ¦µÄelmoµÄ±àÂëÆ÷µÄÊı¾İ
-  *@  input     : elmoID   ÎŞ·ûºÅ8Î»Êı¾İ 
+  *@  function  : è¯»å–å¯¹åº”çš„elmoçš„ç¼–ç å™¨çš„æ•°æ®
+  *@  input     : elmoID   æ— ç¬¦å·8ä½æ•°æ® 
   *@  output    : None
 ********************************************************************************
 */
 void Elmo_Set_POS(uint8_t elmoID,int32_t POS)
 {
-	  //¹Ø±Õµç»ú£¬ÕâÊÇÉèÖÃÎ»ÖÃÖµµÄÏÈ¾öÌõ¼ş
+	  //å…³é—­ç”µæœºï¼Œè¿™æ˜¯è®¾ç½®ä½ç½®å€¼çš„å…ˆå†³æ¡ä»¶
 	  RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_OFF);
 		Elmo_Delay100us_IDx(&elmo[elmoID],90);
 	
-	  //¶Ô±àÂëÆ÷µÄÖµ½øĞĞÉèÖÃ
+	  //å¯¹ç¼–ç å™¨çš„å€¼è¿›è¡Œè®¾ç½®
 	  RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"PX", 0, TYPE_INTEGER, POS);
 		Elmo_Delay100us_IDx(&elmo[elmoID],90);
 	
-	  //¿ªÆôµç»ú
+	  //å¼€å¯ç”µæœº
 	  RPDO2_Cmd_data(&elmo[elmoID], (uint8_t *)"MO", 0, TYPE_INTEGER, MO_ON);
 		Elmo_Delay100us_IDx(&elmo[elmoID],90);
-	  //¸üĞÂµ±Ç°µç»ú×´Ì¬
+	  //æ›´æ–°å½“å‰ç”µæœºçŠ¶æ€
 	  elmo[elmoID].CurOPMode = UM_UNC;
 	
 
@@ -2026,20 +2038,20 @@ void Elmo_Set_POS(uint8_t elmoID,int32_t POS)
 /*
 ********************************************************************************
   *@  name      : Elmo_Read_ACT_CUR
-  *@  function  : ¶ÁÈ¡¶ÔÓ¦µÄelmoµÄÓĞĞ§µçÁ÷
-  *@  input     : elmoID   ÎŞ·ûºÅ8Î»Êı¾İ 
+  *@  function  : è¯»å–å¯¹åº”çš„elmoçš„æœ‰æ•ˆç”µæµ
+  *@  input     : elmoID   æ— ç¬¦å·8ä½æ•°æ® 
   *@  output    : None
 ********************************************************************************
 */
 void Elmo_Read_ACT_CUR(uint8_t elmoID)
 {
-	//¿ªÆôTPDO2
+	//å¼€å¯TPDO2
     RSDO(&elmo[0], 0x1A01, 0x00,1);
 	Elmo_Delay100us_IDx(&elmo[elmoID],50);
-    //¶ÁÈ¡elmo±àÂëÆ÷µÄÊıÖµ
+    //è¯»å–elmoç¼–ç å™¨çš„æ•°å€¼
     RPDO2_Cmd_string(&elmo[elmoID], (uint8_t *)"IQ");
 	Elmo_Delay100us_IDx(&elmo[elmoID],20);
-	//¹Ø±ÕTPDO2
+	//å…³é—­TPDO2
     RSDO(&elmo[0], 0x1A01, 0x00,0);
 	Elmo_Delay100us_IDx(&elmo[elmoID],50);
 

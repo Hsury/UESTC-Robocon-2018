@@ -2,8 +2,6 @@
 #include "usbd_ioreq.h"
 #include "Includes.h"
 
-extern TaskHandle_t BeepTask_Handler;
-
 USBD_Usr_cb_TypeDef USR_cb =
 {
     USBD_USR_Init,

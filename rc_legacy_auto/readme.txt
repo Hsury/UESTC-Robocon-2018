@@ -10,9 +10,9 @@
          \///\\\\\\\\\/   \/\\\\\\\\\\\\\\\ \///\\\\\\\\\\\/         \/\\\          \////\\\\\\\\\  
             \/////////     \///////////////    \///////////           \///              \/////////  
 
-                   ===== UESTC Raspberry Pi Executor For ABU Robocon 2018 =====
+                     ===== UESTC Legacy Auto Robot For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/03/07
+                                        VERSION 2018/03/15
 
 */

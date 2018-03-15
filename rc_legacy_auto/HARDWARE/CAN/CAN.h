@@ -3,15 +3,21 @@
 
 #include "Includes.h"
 
-#define ELMO1_CAN_ID    0x701
-#define ELMO2_CAN_ID    0x702
-#define ELMO3_CAN_ID    0x703
+#define ELMO1_CAN_ID                0x701
+#define ELMO2_CAN_ID                0x702
+#define ELMO3_CAN_ID                0x703
 
-#define GE_POS_CAN_ID   0x12
-#define GE_ANG_CAN_ID   0x11
-#define GE_CTRL_CAN_ID  0x15
+#define GE_POS_CAN_ID               0x12
+#define GE_ANG_CAN_ID               0x11
+#define GE_CTRL_CAN_ID              0x15
 
-#define KEYBOARD_CAN_ID 0x30
+#define GY53_A_CAN_ID               0x21
+#define GY53_B_CAN_ID               0x22
+
+#define KEYBOARD_CAN_ID             0x30
+
+#define PROBE_TIMER_CAN_ID          0xA0
+#define PROBE_INTERACT_CAN_ID       0x72
 
 void Dual_CAN_Init(void);
 uint8_t CAN1_Send(CanTxMsg* TxMessage);

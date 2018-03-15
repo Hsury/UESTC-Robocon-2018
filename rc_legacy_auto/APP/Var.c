@@ -2,9 +2,6 @@
 
 uint32_t Online = 0x00000000;
 
-uint32_t GyroTS = 0;
-uint32_t EncoderTS = 0;
-
 float RealAccX = 0;
 float RealAccY = 0;
 float RealAccZ = 0;
@@ -19,4 +16,11 @@ float VelZ = 0;
 
 float PosX = 0;
 float PosY = 0;
-float AngZ = 0;
+float PosZ = 0;
+
+float GoalX = 0;
+float GoalY = 0;
+float GoalZ = 0;
+
+float GY53A = 0;
+float GY53B = 0;
