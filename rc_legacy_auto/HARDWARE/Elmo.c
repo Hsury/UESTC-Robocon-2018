@@ -173,9 +173,9 @@ void Elmo_Reinit(uint8_t elmoID)
     /* 初始化加速度 */
 	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"PM", 0, TYPE_INTEGER, 0x01);
 	Elmo_Delay100us_IDx(&elmo[elmoID],20); //最大加速度1000000000 1000000
-	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"AC", 0, TYPE_INTEGER, 1000000);
+	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"AC", 0, TYPE_INTEGER, 250000000);
 	Elmo_Delay100us_IDx(&elmo[elmoID],40); //最大减速度1000000000
-	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"DC", 0, TYPE_INTEGER, 1000000);
+	RPDO2_Cmd_data(&elmo[0], (uint8_t *)"DC", 0, TYPE_INTEGER, 500000000);
 	Elmo_Delay100us_IDx(&elmo[elmoID],40);             
     
     /* 关闭驱动 */
@@ -2056,6 +2056,3 @@ void Elmo_Read_ACT_CUR(uint8_t elmoID)
 	Elmo_Delay100us_IDx(&elmo[elmoID],50);
 
 }
-
-
-

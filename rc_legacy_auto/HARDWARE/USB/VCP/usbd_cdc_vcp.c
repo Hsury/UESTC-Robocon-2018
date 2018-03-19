@@ -175,8 +175,9 @@ uint16_t VCP_DataRx (uint8_t* Buf, uint32_t Len)
     {
         RingBuf_Overwrite(&USB_RingBuf, Buf + i);
         Checkout(&USB_RingBuf);
-//        USART_SendData(USART1, *(Buf + i));
 //        while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
+//        USART_SendData(USART1, *(Buf + i));
+//        while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
     }
     return USBD_OK;
 }

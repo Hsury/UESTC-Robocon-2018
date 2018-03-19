@@ -65,6 +65,43 @@ void Move_PID_SetLimits(float MaxX, float MaxY, float MaxZ)
     if (MaxZ > 0) PID_SetOutputLimits(&PIDZ, -MaxZ, MaxZ);
 }
 
+bool Move_Update_Zone()
+{
+    if (PosX >= 2.5f && PosX <= 4.0f && PosY >= 2.75f && PosY <= 3.5f)
+    {
+        if (Zone != 1)
+        {
+            Zone = 1;
+            return true;
+        }
+    }
+    else if (PosX >= 2.5f && PosX <= 4.0f && PosY >= 0.75f && PosY <= 1.5f)
+    {
+        if (Zone != 2)
+        {
+            Zone = 2;
+            return true;
+        }
+    }
+    else if (PosX >= 6.5f && PosX <= 8.0f && PosY >= 0.75f && PosY <= 1.5f)
+    {
+        if (Zone != 3)
+        {
+            Zone = 3;
+            return true;
+        }
+    }
+    else
+    {
+        if (Zone != 0)
+        {
+            Zone = 0;
+            return true;
+        }
+    }
+    return false;
+}
+
 float CubicBezier(float P0, float P1, float P2, float P3, float T)
 {
     T = clamp(T, 0, 1);

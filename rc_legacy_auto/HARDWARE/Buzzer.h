@@ -4,7 +4,7 @@
 #include "Includes.h"
 
 void Buzzer_Init(void);
-void BuzzerOn(void);
-void BuzzerOff(void);
+void Buzzer_On(void);
+void Buzzer_Off(void);
 
 #endif

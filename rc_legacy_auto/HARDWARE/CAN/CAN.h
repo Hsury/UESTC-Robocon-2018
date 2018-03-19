@@ -6,6 +6,11 @@
 #define ELMO1_CAN_ID                0x701
 #define ELMO2_CAN_ID                0x702
 #define ELMO3_CAN_ID                0x703
+#define ELMO4_CAN_ID                0x704
+#define ELMO5_CAN_ID                0x705
+
+#define SLIDER_POS_CAN_ID           0x284
+#define TONG_POS_CAN_ID             0x285
 
 #define GE_POS_CAN_ID               0x12
 #define GE_ANG_CAN_ID               0x11
@@ -16,7 +21,11 @@
 
 #define KEYBOARD_CAN_ID             0x30
 
-#define PROBE_TIMER_CAN_ID          0xA0
+#define CRADLE_CAN_ID               0x72
+
+#define PROBE_ONLINE_CAN_ID         0xA0
+#define PROBE_USER_CAN_ID           0xA1
+#define PROBE_TIMER_CAN_ID          0xA2
 #define PROBE_INTERACT_CAN_ID       0x72
 
 void Dual_CAN_Init(void);

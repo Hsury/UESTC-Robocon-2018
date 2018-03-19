@@ -20,6 +20,7 @@
 // Peripheral Level
 #include "CAN.h"
 #include "AirUART.h"
+#include "CH340.h"
 #include "usbd_cdc_core.h"
 #include "usbd_usr.h"
 #include "usb_conf.h"
@@ -37,6 +38,7 @@
 #include "Elmo.h"
 #include "GyroEncoder.h"
 #include "Probe.h"
+#include "Loader.h"
 
 // Application Level
 #include "Algorithm.h"

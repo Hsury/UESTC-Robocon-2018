@@ -202,7 +202,7 @@ void USART2_IRQHandler()
     }
     else
     {
-        if(USART_GetFlagStatus(USART2, USART_FLAG_ORE) == SET)
+        if (USART_GetFlagStatus(USART2, USART_FLAG_ORE) == SET)
         {
             USART_ClearFlag(USART2, USART_FLAG_ORE);
             USART_ReceiveData(USART2);
@@ -213,8 +213,9 @@ void USART2_IRQHandler()
 
 void AirUART_Send_Raw(uint8_t Byte)
 {
+    while (USART_GetFlagStatus(USART2, USART_FLAG_TXE) == RESET);
     USART_SendData(USART2, Byte);
-    while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
+    while (USART_GetFlagStatus(USART2, USART_FLAG_TC) == RESET);
 }
 
 void AirUART_Send_RST()

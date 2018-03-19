@@ -25,6 +25,7 @@ void Move_PID_SetTunings(float KpX, float KiX, float KdX,
                          float KpY, float KiY, float KdY, 
                          float KpZ, float KiZ, float KdZ);
 void Move_PID_SetLimits(float MaxX, float MaxY, float MaxZ);
+bool Move_Update_Zone(void);
 float CubicBezier(float P0, float P1, float P2, float P3, float T);
 
 #endif

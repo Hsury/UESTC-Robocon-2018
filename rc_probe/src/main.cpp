@@ -103,10 +103,13 @@ P.P.S. TFT and Touchscreen are using VSPI, transactions (To work with other devi
 #define GY53_A_ID 0x21
 #define GY53_B_ID 0x22
 #define DT35_ID 0x23
-#define Timer_ID 0xA0
+#define Keyboard_ID 0x30
 #define TouchScreen_ID 0x60
 #define Cradle_ID 0x72
 #define Hint_Tone_ID 0x74
+#define Online_ID 0xA0
+#define User_ID 0xA1
+#define Timer_ID 0xA2
 
 /*
 CAN Device Table
@@ -166,11 +169,13 @@ String LogHistory[13 * 20]; // Record for 20 pages at most
 uint16_t LogPtr = 0;
 
 uint32_t DeviceNotify[NOTIFY_DEVICE_NUM];
+uint32_t Online;
+float User;
+uint32_t Timer[8];
 float Gyroscope;
 float Encoder[2]; // X-Y coordinate
 float GY53[2]; // Array to save the data of GY53s
 int32_t DT35;
-uint32_t Timer[8];
 uint16_t TouchScreen[2]; // X-Y coordinate
 
 boolean isRTC = false;
@@ -559,22 +564,82 @@ void TFTTask(void * pvParameters)
             {
                 tft.fillScreen(TFT_BLACK);
                 tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
-                tft.pushImage(288, 0, 32, 32, bitmap_refresh, TFT_BLACK);
-
-                tft.pushImage(128, 32, 32, 32, bitmap_pass, TFT_BLACK); // Make black as transparent color
-                tft.pushImage(192, 32, 32, 32, bitmap_fail, TFT_BLACK); // Make black as transparent color
-
-                tft.drawRect(32, 80, 80, 50, TFT_WHITE);
+                tft.setTextSize(2);
                 tft.setTextDatum(CC_DATUM);
-                tft.drawString("Skip ST", 72 , 105);
+                tft.drawString("ROBOT CTRL PANEL", 176 , 16);
                 tft.setTextDatum(TL_DATUM);
-
-                tft.drawRect(32, 160, 80, 50, TFT_WHITE);
+                tft.setTextSize(1);
+                //tft.pushImage(288, 0, 32, 32, bitmap_refresh, TFT_BLACK);
+                tft.setFreeFont(&FreeSans9pt7b);
+                tft.setTextDatum(C_BASELINE);
+                tft.drawString("Elmo", 98 , 50);
+                tft.drawLine(98, 56, 98, 60, TFT_WHITE);
+                tft.drawLine(26, 60, 170, 60, TFT_WHITE);
+                tft.drawLine(26, 60, 26, 68, TFT_WHITE);
+                tft.drawLine(62, 60, 62, 68, TFT_WHITE);
+                tft.drawLine(98, 60, 98, 68, TFT_WHITE);
+                tft.drawLine(134, 60, 134, 68, TFT_WHITE);
+                tft.drawLine(170, 60, 170, 68, TFT_WHITE);
+                tft.drawString("Gyro", 214 , 50);
+                tft.drawLine(214, 56, 214, 60, TFT_WHITE);
+                tft.drawLine(214, 60, 214, 68, TFT_WHITE);
+                tft.drawString("Laser", 276 , 50);
+                tft.drawLine(276, 56, 276, 60, TFT_WHITE);
+                tft.drawLine(258, 60, 294, 60, TFT_WHITE);
+                tft.drawLine(258, 60, 258, 68, TFT_WHITE);
+                tft.drawLine(294, 60, 294, 68, TFT_WHITE);
+                tft.setTextFont(2);
+                tft.setTextDatum(TL_DATUM);
+                tft.drawRect(8, 120, 73, 50, TFT_WHITE);
                 tft.setTextDatum(CC_DATUM);
-                tft.drawString("Launch", 72 , 185);
+                tft.drawString("SZ->TZ1", 44 , 145);
+                tft.setTextDatum(TL_DATUM);
+                tft.drawRect(85, 120, 73, 50, TFT_WHITE);
+                tft.setTextDatum(CC_DATUM);
+                tft.drawString("TZ1->TZ2", 121 , 145);
+                tft.setTextDatum(TL_DATUM);
+                tft.drawRect(162, 120, 73, 50, TFT_WHITE);
+                tft.setTextDatum(CC_DATUM);
+                tft.drawString("TZ2->TZ3", 198 , 145);
+                tft.setTextDatum(TL_DATUM);
+                tft.drawRect(239, 120, 73, 50, TFT_WHITE);
+                tft.setTextDatum(CC_DATUM);
+                tft.drawString("TZ3->TZ2", 275 , 145);
+                tft.setTextDatum(TL_DATUM);
+                tft.drawRect(8, 174, 73, 50, TFT_WHITE);
+                tft.setTextDatum(CC_DATUM);
+                tft.drawString("TZ1->TZ2", 44 , 199);
+                tft.setTextDatum(TL_DATUM);
+                tft.drawRect(85, 174, 73, 50, TFT_WHITE);
+                tft.setTextDatum(CC_DATUM);
+                tft.drawString("Slider", 121 , 199);
+                tft.setTextDatum(TL_DATUM);
+                tft.drawRect(162, 174, 73, 50, TFT_WHITE);
+                tft.setTextDatum(CC_DATUM);
+                tft.drawString("Tong", 198 , 199);
+                tft.setTextDatum(TL_DATUM);
+                tft.drawRect(239, 174, 73, 50, TFT_WHITE);
+                tft.setTextDatum(CC_DATUM);
+                tft.drawString("Reset MCU", 275 , 199);
                 tft.setTextDatum(TL_DATUM);
                 redraw = false;
             }
+            if (Online & (1 << 0)) tft.pushImage(8, 74, 32, 32, bitmap_pass); // Elmo1
+            else tft.pushImage(8, 74, 32, 32, bitmap_fail);
+            if (Online & (1 << 1)) tft.pushImage(44, 74, 32, 32, bitmap_pass); // Elmo2
+            else tft.pushImage(44, 74, 32, 32, bitmap_fail);
+            if (Online & (1 << 2)) tft.pushImage(80, 74, 32, 32, bitmap_pass); // Elmo3
+            else tft.pushImage(80, 74, 32, 32, bitmap_fail);
+            if (Online & (1 << 3)) tft.pushImage(116, 74, 32, 32, bitmap_pass); // Elmo4
+            else tft.pushImage(116, 74, 32, 32, bitmap_fail);
+            if (Online & (1 << 4)) tft.pushImage(152, 74, 32, 32, bitmap_pass); // Elmo5
+            else tft.pushImage(152, 74, 32, 32, bitmap_fail);
+            if (Online & (1 << 5)) tft.pushImage(196, 74, 32, 32, bitmap_pass); // Gyro&Encoder
+            else tft.pushImage(196, 74, 32, 32, bitmap_fail);
+            if (Online & (1 << 6)) tft.pushImage(240, 74, 32, 32, bitmap_pass); // GY53A
+            else tft.pushImage(240, 74, 32, 32, bitmap_fail);
+            if (Online & (1 << 7)) tft.pushImage(276, 74, 32, 32, bitmap_pass); // GY53B
+            else tft.pushImage(276, 74, 32, 32, bitmap_fail);
             break;
 
             case 3: // @Variable
@@ -590,13 +655,13 @@ void TFTTask(void * pvParameters)
                     case 0: // @Variable.Summary
                     tft.setFreeFont(&FreeSans9pt7b);
                     tft.setTextDatum(R_BASELINE);
-                    tft.drawString("Gyro:", 144, 64);
-                    tft.drawString("Encoder[X]:", 144, 88);
-                    tft.drawString("Encoder[Y]:", 144, 112);
-                    tft.drawString("GY53[A]:", 144, 136);
-                    tft.drawString("GY53[B]:", 144, 160);
-                    tft.drawString("DT35:", 144, 184);
-                    tft.drawString("User:", 144, 208);
+                    tft.drawString("Gyro:", 144, 60);
+                    tft.drawString("Encoder[X]:", 144, 84);
+                    tft.drawString("Encoder[Y]:", 144, 108);
+                    tft.drawString("GY53[A]:", 144, 132);
+                    tft.drawString("GY53[B]:", 144, 156);
+                    tft.drawString("DT35:", 144, 180);
+                    tft.drawString("User:", 144, 204);
                     tft.setTextFont(2);
                     tft.setTextDatum(TL_DATUM);
                     break;
@@ -604,14 +669,14 @@ void TFTTask(void * pvParameters)
                     case 1: // @Variable.Timer
                     tft.setFreeFont(&FreeSans9pt7b);
                     tft.setTextDatum(R_BASELINE);
-                    tft.drawString("Timer 1:", 144, 64);
-                    tft.drawString("Timer 2:", 144, 88);
-                    tft.drawString("Timer 3:", 144, 112);
-                    tft.drawString("Timer 4:", 144, 136);
-                    tft.drawString("Timer 5:", 144, 160);
-                    tft.drawString("Timer 6:", 144, 184);
-                    tft.drawString("Timer 7:", 144, 208);
-                    tft.drawString("Timer 8:", 144, 232);
+                    tft.drawString("Timer 1:", 144, 60);
+                    tft.drawString("Timer 2:", 144, 84);
+                    tft.drawString("Timer 3:", 144, 108);
+                    tft.drawString("Timer 4:", 144, 132);
+                    tft.drawString("Timer 5:", 144, 156);
+                    tft.drawString("Timer 6:", 144, 180);
+                    tft.drawString("Timer 7:", 144, 204);
+                    tft.drawString("Timer 8:", 144, 228);
                     tft.setTextFont(2);
                     tft.setTextDatum(TL_DATUM);
                     break;
@@ -639,13 +704,13 @@ void TFTTask(void * pvParameters)
                 tft.setFreeFont(&FreeSans9pt7b);
                 tft.setTextDatum(L_BASELINE);
                 tft.setTextPadding(160);
-                tft.drawString(String(Gyroscope, 3), 160, 64);
-                tft.drawString(String(Encoder[0], 3), 160, 88);
-                tft.drawString(String(Encoder[1], 3), 160, 112);
-                tft.drawString(String(GY53[0], 3), 160, 136);
-                tft.drawString(String(GY53[1], 3), 160, 160);
-                tft.drawString(String(DT35), 160, 184);
-                //tft.drawString(String(Timer[0]), 160, 208);
+                tft.drawString(String(Gyroscope, 3), 160, 60);
+                tft.drawString(String(Encoder[0], 3), 160, 84);
+                tft.drawString(String(Encoder[1], 3), 160, 108);
+                tft.drawString(String(GY53[0], 3), 160, 132);
+                tft.drawString(String(GY53[1], 3), 160, 156);
+                tft.drawString(String(DT35), 160, 180);
+                tft.drawString(String(User, 4), 160, 204);
                 tft.setTextFont(2);
                 tft.setTextDatum(TL_DATUM);
                 tft.setTextPadding(0);
@@ -655,14 +720,14 @@ void TFTTask(void * pvParameters)
                 tft.setFreeFont(&FreeSans9pt7b);
                 tft.setTextDatum(L_BASELINE);
                 tft.setTextPadding(160);
-                tft.drawString(String(Timer[0]), 160, 64);
-                tft.drawString(String(Timer[1]), 160, 88);
-                tft.drawString(String(Timer[2]), 160, 112);
-                tft.drawString(String(Timer[3]), 160, 136);
-                tft.drawString(String(Timer[4]), 160, 160);
-                tft.drawString(String(Timer[5]), 160, 184);
-                tft.drawString(String(Timer[6]), 160, 208);
-                tft.drawString(String(Timer[7]), 160, 232);
+                tft.drawString(String(Timer[0]), 160, 60);
+                tft.drawString(String(Timer[1]), 160, 84);
+                tft.drawString(String(Timer[2]), 160, 108);
+                tft.drawString(String(Timer[3]), 160, 132);
+                tft.drawString(String(Timer[4]), 160, 156);
+                tft.drawString(String(Timer[5]), 160, 180);
+                tft.drawString(String(Timer[6]), 160, 204);
+                tft.drawString(String(Timer[7]), 160, 228);
                 tft.setTextFont(2);
                 tft.setTextDatum(TL_DATUM);
                 tft.setTextPadding(0);
@@ -828,6 +893,11 @@ void TFTTask(void * pvParameters)
                 case 1: // @Main
                 if (xTouch >= 13 && xTouch <= 152 && yTouch >= 57 && yTouch <= 106) // => Selftest
                 {
+                    Online = 0;
+                    CAN_tx_frame.MsgID = Keyboard_ID;
+                    CAN_tx_frame.FIR.B.DLC = 1;
+                    CAN_tx_frame.data.u8[0] = 0x01;
+                    ESP32Can.CANWriteFrame(&CAN_tx_frame);
                     scene = 2;
                     redraw = true;
                 }
@@ -865,6 +935,7 @@ void TFTTask(void * pvParameters)
 
                 case 2: // @Selftest
                 if (xTouch >= 0 && xTouch <= 32 && yTouch >= 0 && yTouch <= 32) goto Home; // Home
+                /*
                 else if (xTouch >= 288 && xTouch <= 320 && yTouch >= 0 && yTouch <= 32) // REBOOT
                 {
                     CAN_tx_frame.MsgID = 0xAA;
@@ -876,16 +947,61 @@ void TFTTask(void * pvParameters)
                         xTaskCreate(RobotSelftestTask, "Robot Selftest Control", 4096, NULL, 5, &RobotSelftestTaskHandle);
                     }
                 }
-                else if (xTouch >= 32 && xTouch <= 112 && yTouch >= 80 && yTouch <= 130) // SKIP SELFTEST
+                */
+                else if (xTouch >= 8 && xTouch <= 81 && yTouch >= 120 && yTouch <= 170) // Button 1
                 {
-                    CAN_tx_frame.MsgID = 0xAB;
+                    CAN_tx_frame.MsgID = Keyboard_ID;
                     CAN_tx_frame.FIR.B.DLC = 1;
+                    CAN_tx_frame.data.u8[0] = 0x05;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
                 }
-                else if (xTouch >= 32 && xTouch <= 112 && yTouch >= 140 && yTouch <= 190) // LAUNCH
+                else if (xTouch >= 85 && xTouch <= 158 && yTouch >= 120 && yTouch <= 170) // Button 2
                 {
-                    CAN_tx_frame.MsgID = 0xAC;
+                    CAN_tx_frame.MsgID = Keyboard_ID;
                     CAN_tx_frame.FIR.B.DLC = 1;
+                    CAN_tx_frame.data.u8[0] = 0x06;
+                    ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                }
+                else if (xTouch >= 162 && xTouch <= 235 && yTouch >= 120 && yTouch <= 170) // Button 3
+                {
+                    CAN_tx_frame.MsgID = Keyboard_ID;
+                    CAN_tx_frame.FIR.B.DLC = 1;
+                    CAN_tx_frame.data.u8[0] = 0x07;
+                    ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                }
+                else if (xTouch >= 239 && xTouch <= 312 && yTouch >= 120 && yTouch <= 170) // Button 4
+                {
+                    CAN_tx_frame.MsgID = Keyboard_ID;
+                    CAN_tx_frame.FIR.B.DLC = 1;
+                    CAN_tx_frame.data.u8[0] = 0x08;
+                    ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                }
+                else if (xTouch >= 8 && xTouch <= 81 && yTouch >= 174 && yTouch <= 224) // Button 5
+                {
+                    CAN_tx_frame.MsgID = Keyboard_ID;
+                    CAN_tx_frame.FIR.B.DLC = 1;
+                    CAN_tx_frame.data.u8[0] = 0x09;
+                    ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                }
+                else if (xTouch >= 85 && xTouch <= 158 && yTouch >= 174 && yTouch <= 224) // Button 6
+                {
+                    CAN_tx_frame.MsgID = Keyboard_ID;
+                    CAN_tx_frame.FIR.B.DLC = 1;
+                    CAN_tx_frame.data.u8[0] = 0x0A;
+                    ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                }
+                else if (xTouch >= 162 && xTouch <= 235 && yTouch >= 174 && yTouch <= 224) // Button 7
+                {
+                    CAN_tx_frame.MsgID = Keyboard_ID;
+                    CAN_tx_frame.FIR.B.DLC = 1;
+                    CAN_tx_frame.data.u8[0] = 0x0B;
+                    ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                }
+                else if (xTouch >= 239 && xTouch <= 312 && yTouch >= 174 && yTouch <= 224) // Button 8
+                {
+                    CAN_tx_frame.MsgID = Keyboard_ID;
+                    CAN_tx_frame.FIR.B.DLC = 1;
+                    CAN_tx_frame.data.u8[0] = 0xFF;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
                 }
                 break;
@@ -1094,10 +1210,6 @@ void CANRecvTask(void * pvParameters)
                 memcpy(&TouchScreen[1], &CAN_rx_frame.data.u8[2], 2);
                 break;
 
-                case Timer_ID:
-                if (CAN_rx_frame.data.u8[0] < 8) memcpy(&Timer[CAN_rx_frame.data.u8[0]], &CAN_rx_frame.data.u8[1], 4);
-                break;
-
                 case Cradle_ID:
                 if (CAN_rx_frame.data.u8[0] == 0xAA) // Base reports that it has arrived in TZx
                 {
@@ -1129,6 +1241,18 @@ void CANRecvTask(void * pvParameters)
                     AddToPlaylist(2);
                     AddToPlaylist(19);
                 }
+                break;
+
+                case Online_ID:
+                memcpy(&Online, &CAN_rx_frame.data.u8[0], 4);
+                break;
+
+                case User_ID:
+                memcpy(&User, &CAN_rx_frame.data.u8[0], sizeof(User));
+                break;
+
+                case Timer_ID:
+                if (CAN_rx_frame.data.u8[0] < 8) memcpy(&Timer[CAN_rx_frame.data.u8[0]], &CAN_rx_frame.data.u8[1], 4);
                 break;
             }
         }

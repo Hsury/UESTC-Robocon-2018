@@ -76,6 +76,43 @@ void GY53_PWM_Init()
     NVIC_Init(&NVIC_InitStructure);                                                         //根据指定的参数初始化NVIC寄存器
 }
 
+bool GY53_Relocate()
+{
+    Move_Update_Zone();
+    if ((Zone == 1 || Zone == 2 || Zone == 3) &&  //只在TZ1，TZ2，TZ3内进行重定位
+        (fabs(PosZ) < 15) &&                      //偏角在15度以内
+        (fabs(VelY) < 0.05) &&                    //Y轴速度小于5cm/s
+        (fabs(VelZ) < 5) &&                       //Z轴速度小于5度/s
+        (fabs(PosZ - GY532RealZ) < 15))           //GY53算出的角度和陀螺仪反馈的角度差值小于15度
+    {
+        if (Zone == 1 && fabs(GY532RealY - 0.56) <= 0.2)
+        {
+            GyroEncoder_Off();
+            PosY = 3.37 + 0.56 - GY532RealY;
+            GyroEncoder_SetPos();
+            GyroEncoder_On();
+            return true;
+        }
+        else if (Zone == 2 && fabs(GY532RealY - 0.65) <= 0.2)
+        {
+            GyroEncoder_Off();
+            PosY = 1.27 + 0.65 - GY532RealY;
+            GyroEncoder_SetPos();
+            GyroEncoder_On();
+            return true;
+        }
+        else if (Zone == 3 && fabs(GY532RealY - 0.68) <= 0.2)
+        {
+            GyroEncoder_Off();
+            PosY = 1.27 + 0.68 - GY532RealY;
+            GyroEncoder_SetPos();
+            GyroEncoder_On();
+            return true;
+        }
+    }
+    return false;
+}
+
 void TIM3_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM3, TIM_IT_CC1) != RESET)
@@ -96,6 +133,7 @@ void TIM3_IRQHandler(void)
                 CAN2_Send(&TxMessage);
             }
             TIM_OC1PolarityConfig(TIM3, TIM_ICPolarity_Rising);         //CC1P=0，设置为上升沿捕获
+            Online |= (1 << 6);
         }
         else
         {
@@ -129,6 +167,7 @@ void TIM4_IRQHandler(void)
                 CAN2_Send(&TxMessage);
             }
             TIM_OC1PolarityConfig(TIM4, TIM_ICPolarity_Rising);         //CC1P=0，设置为上升沿捕获
+            Online |= (1 << 7);
         }
         else
         {

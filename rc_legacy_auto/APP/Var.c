@@ -2,6 +2,8 @@
 
 uint32_t Online = 0x00000000;
 
+uint8_t Zone = 0;
+
 float RealAccX = 0;
 float RealAccY = 0;
 float RealAccZ = 0;

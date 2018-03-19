@@ -36,13 +36,12 @@ int fputc(int ch, FILE *f)
 
 #endif
 
-#if EN_USART1_RX //如果使能了接收
 //串口1中断服务程序
 //注意,读取USARTx->SR能避免莫名其妙的错误
 
 //初始化IO 串口1
-//bound:波特率
-void uart_init(uint32_t bound)
+//Baudrate:波特率
+void UART_Init(uint32_t Baudrate)
 {
     //GPIO端口设置
     GPIO_InitTypeDef GPIO_InitStructure;
@@ -65,7 +64,7 @@ void uart_init(uint32_t bound)
     GPIO_Init(GPIOA, &GPIO_InitStructure); //初始化PA9，PA10
     
     //USART1 初始化设置
-    USART_InitStructure.USART_BaudRate = bound; //波特率设置
+    USART_InitStructure.USART_BaudRate = Baudrate; //波特率设置
     USART_InitStructure.USART_WordLength = USART_WordLength_8b; //字长为8位数据格式
     USART_InitStructure.USART_StopBits = USART_StopBits_1; //一个停止位
     USART_InitStructure.USART_Parity = USART_Parity_No; //无奇偶校验位
@@ -77,7 +76,6 @@ void uart_init(uint32_t bound)
     
     USART_ClearFlag(USART1, USART_FLAG_TC);
     
-    #if EN_USART1_RX
     USART_ITConfig(USART1, USART_IT_RXNE, ENABLE); //开启相关中断
     //USART1 NVIC 配置
     NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn; //串口1中断通道
@@ -85,7 +83,6 @@ void uart_init(uint32_t bound)
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0; //子优先级0
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE; //IRQ通道使能
     NVIC_Init(&NVIC_InitStructure); //根据指定的参数初始化VIC寄存器
-    #endif
     
     UART_RingBuf = RingBuf_Create(8, 1);
 }
@@ -102,7 +99,7 @@ void USART1_IRQHandler(void)
     }
     else
     {
-        if(USART_GetFlagStatus(USART1, USART_FLAG_ORE) == SET)
+        if (USART_GetFlagStatus(USART1, USART_FLAG_ORE) == SET)
         {
             USART_ClearFlag(USART1, USART_FLAG_ORE);
             USART_ReceiveData(USART1);
@@ -110,5 +107,3 @@ void USART1_IRQHandler(void)
         USART_ClearFlag(USART1, USART_IT_RXNE);
     }
 }
-
-#endif

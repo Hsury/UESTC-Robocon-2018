@@ -475,6 +475,16 @@
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\Cylinder.c</FilePath>
             </File>
+            <File>
+              <FileName>Loader.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\Loader.c</FilePath>
+            </File>
+            <File>
+              <FileName>Cradle.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\Cradle.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -494,6 +504,11 @@
               <FileName>AirUART.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\UART\AirUART.c</FilePath>
+            </File>
+            <File>
+              <FileName>CH340.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\UART\CH340.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -7,10 +7,12 @@ extern TaskHandle_t FlashTask_Handler;
 extern TaskHandle_t BeepTask_Handler;
 extern TaskHandle_t ReportTask_Handler;
 extern TaskHandle_t MoveTask_Handler;
+extern TaskHandle_t LoadTask_Handler;
 
 void FlashTask(void *pvParameters);
 void BeepTask(void *pvParameters);
 void ReportTask(void *pvParameters);
 void MoveTask(void *pvParameters);
+void LoadTask(void *pvParameters);
 
 #endif

@@ -1,5 +1,6 @@
 #ifndef __ELMO_H
 #define __ELMO_H
+
 #include "Includes.h"
 
 /*******************************************************************************
@@ -11,7 +12,7 @@
 
 
 /* 循环队列参数 */
-#define ELMO_NUM            3                               // Elmo个数,必须严格按照挂载个数的ELMO配置，不得多配置！！！
+#define ELMO_NUM            5                               // Elmo个数,必须严格按照挂载个数的ELMO配置，不得多配置！！！
 #define CAN_BUF_NUM         150                             //缓冲指令条数  改成200了 原来是1000  又减小到了150
 #define CAN_ID_DELAY        0x129                           //延时指令
 

@@ -24,7 +24,7 @@ uint8_t Checkout(RingBuf_t* Q)
             case 0x00: // 全局级别
             switch (Data.U)
             {
-                case 0x00000000:; // 报告外设上线状态
+                case 0x00000000: // 报告外设上线状态
                 PackUp(0x00, (uint8_t*)(&Online));
                 break;
                 
@@ -125,8 +125,9 @@ void PackUp(uint8_t Addr, uint8_t* Data)
     Buf[7] = '}';
     for (uint8_t i = 0; i < 8; i++)
     {
-        USART_SendData(USART1, *(Buf + i));
         while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
+        USART_SendData(USART1, *(Buf + i));
+        while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
     }
     if (isVCPAvailable) VCP_DataTx(Buf, 8);
     //VCP_DataTx("\r\n", 2);

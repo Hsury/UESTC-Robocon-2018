@@ -5,8 +5,7 @@
 
 extern uint32_t Online;
 
-extern uint32_t GyroTS;
-extern uint32_t EncoderTS;
+extern uint8_t Zone;
 
 extern float RealAccX;
 extern float RealAccY;

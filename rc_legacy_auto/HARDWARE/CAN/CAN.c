@@ -1,26 +1,26 @@
 #include "CAN.h"
 
-GPIO_InitTypeDef       GPIO_InitStructure; 
-CAN_InitTypeDef        CAN_InitStructure;
-CAN_FilterInitTypeDef  CAN_FilterInitStructure;
-NVIC_InitTypeDef       NVIC_InitStructure;
+GPIO_InitTypeDef        GPIO_InitStructure; 
+CAN_InitTypeDef         CAN_InitStructure;
+CAN_FilterInitTypeDef   CAN_FilterInitStructure;
+NVIC_InitTypeDef        NVIC_InitStructure;
 
 void Dual_CAN_Init()
 {
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB, ENABLE);                                          // GPIO时钟初始化
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD | RCC_AHB1Periph_GPIOB, ENABLE);                   // GPIO时钟初始化
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_CAN1 | RCC_APB1Periph_CAN2, ENABLE);                     // CAN外设时钟初始化
 
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF;                                                  // 复用功能
     GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;                                                 // 推挽输出
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;                                             // 翻转速度100MHz
     GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_UP;                                                  // 上拉
-    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_11 | GPIO_Pin_12;                                       // CAN1使用PB8与PB9
-    GPIO_Init(GPIOA, &GPIO_InitStructure);                                                         // 初始化CAN1的GPIO
+    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_0 | GPIO_Pin_1;                                       // CAN1使用PD0与PD1
+    GPIO_Init(GPIOD, &GPIO_InitStructure);                                                         // 初始化CAN1的GPIO
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12 | GPIO_Pin_13;                                     // CAN2使用PB12与PB13
     GPIO_Init(GPIOB, &GPIO_InitStructure);                                                         // 初始化CAN2的GPIO
 
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource11, GPIO_AF_CAN1);                                        // PB8复用为CAN1
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource12, GPIO_AF_CAN1);                                        // PB9复用为CAN1
+    GPIO_PinAFConfig(GPIOD, GPIO_PinSource0, GPIO_AF_CAN1);                                        // PD0复用为CAN1
+    GPIO_PinAFConfig(GPIOD, GPIO_PinSource1, GPIO_AF_CAN1);                                        // PD1复用为CAN1
     GPIO_PinAFConfig(GPIOB, GPIO_PinSource12, GPIO_AF_CAN2);                                       // PB12复用为CAN2
     GPIO_PinAFConfig(GPIOB, GPIO_PinSource13, GPIO_AF_CAN2);                                       // PB13复用为CAN2
 
@@ -104,6 +104,22 @@ void CAN1_RX0_IRQHandler()
         case ELMO3_CAN_ID:
         Online |= (1 << 2);
         break;
+        
+        case ELMO4_CAN_ID:
+        Online |= (1 << 3);
+        break;
+        
+        case ELMO5_CAN_ID:
+        Online |= (1 << 4);
+        break;
+        
+        case SLIDER_POS_CAN_ID:
+        //memcpy(&SliderPos, &RxMessage.Data[4], 4);
+        break;
+        
+        case TONG_POS_CAN_ID:
+        //memcpy(&TongPos, &RxMessage.Data[4], 4);
+        break;
     }
     // 在这里添加CAN1中断服务函数
 }
@@ -136,7 +152,7 @@ void CAN2_RX0_IRQHandler()
             PosY = PosYTmp;
             EncoderTS = TS;
         }
-        Online |= (1 << 3);
+        Online |= (1 << 5);
         break;
         
         case GE_ANG_CAN_ID:
@@ -153,13 +169,17 @@ void CAN2_RX0_IRQHandler()
             PosZ = PosZTmp;
             GyroTS = TS;
         }
-        Online |= (1 << 3);
+        Online |= (1 << 5);
         break;
         
         case KEYBOARD_CAN_ID:;
         BaseType_t pxHigherPriorityTaskWoken;
         switch (RxMessage.Data[0])
         {
+            case 0x01: // Report Online Status
+            Probe_ReportOnline();
+            break;
+            
             case 0x05: // SZ => TZ1
             //vTaskNotifyGiveFromISR(MoveTask_Handler, &pxHigherPriorityTaskWoken);
             xTaskNotifyFromISR(MoveTask_Handler, 1, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
@@ -171,6 +191,28 @@ void CAN2_RX0_IRQHandler()
             
             case 0x07: // TZ2 => TZ3
             xTaskNotifyFromISR(MoveTask_Handler, 3, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            break;
+            
+            case 0x08: // TZ3 => TZ2
+            xTaskNotifyFromISR(MoveTask_Handler, 4, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            break;
+            
+            case 0x09: // TZ1 => TZ2
+            xTaskNotifyFromISR(MoveTask_Handler, 5, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            break;
+            
+            case 0x0A: // Slider
+            xTaskNotifyFromISR(LoadTask_Handler, 1, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            break;
+            
+            case 0x0B: // Tong
+            xTaskNotifyFromISR(LoadTask_Handler, 2, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            break;
+            
+            case 0xFF: // Reset MCU
+            Elmo_Close(0);
+            delay_xms(100);
+            NVIC_SystemReset();
             break;
         }
         if (pxHigherPriorityTaskWoken != pdFALSE) taskYIELD();

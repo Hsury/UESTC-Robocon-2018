@@ -13,7 +13,7 @@
 
 #define GY53_A_STATIC_DIST (0.434f - 0.12f)  // 左侧GY53传感器距离车头静态读数
 #define GY53_B_STATIC_DIST (0.434f - 0.09f)  // 右侧GY53传感器距离车头静态读数
-#define GY53_A_B_GAP       (0.234f)           // 两颗GY53的间距
+#define GY53_A_B_GAP       (0.234f)          // 两颗GY53的间距
 
 #define clamp(x, lower, upper) (x > upper ? upper : (x < lower ? lower : x))
 
@@ -29,16 +29,16 @@
 
 #define Real2EncoderX (PosX / (SUBWHEEL_DIAMETER * PI) * 2000 * 1000)
 #define Real2EncoderY (PosY / (SUBWHEEL_DIAMETER * PI) * 2000 * 1000)
-#define Real2GyroZ (PosZ) //(PosZ / PI * 180)
+#define Real2GyroZ (PosZ)
 
 #define Encoder2RealX(x) ((x) * (SUBWHEEL_DIAMETER * PI) / 2000 / 1000)
 #define Encoder2RealY(y) ((y) * (SUBWHEEL_DIAMETER * PI) / 2000 / 1000)
-#define Gyro2RealZ(z) (fmod(z, 360)) //(z * PI / 180)
+#define Gyro2RealZ(z) (fmod(z, 360))
 
 #define DeltaPos(dx, dy) (sqrt((dx) * (dx) + (dy) * (dy)))
 #define DeltaAng(dz) (dz < -180 ? dz + 360 : (dz >= 180 ? dz - 360 : dz))
 
-#define GY532RealY ((GY53A + GY53B) / 2.0f * cos(PosZ))
-#define GY532RealZ (atan2(GY53B - GY53A, GY53_A_B_GAP))
+#define GY532RealY ((GY53A + GY53B) / 2.0f * cos(deg2rad(PosZ)))
+#define GY532RealZ (rad2deg(atan2(GY53A - GY53B, GY53_A_B_GAP)))
 
 #endif
