@@ -476,14 +476,24 @@
               <FilePath>..\HARDWARE\Cylinder.c</FilePath>
             </File>
             <File>
-              <FileName>Loader.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\Loader.c</FilePath>
-            </File>
-            <File>
               <FileName>Cradle.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\Cradle.c</FilePath>
+            </File>
+            <File>
+              <FileName>Sling.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\Sling.c</FilePath>
+            </File>
+            <File>
+              <FileName>AbsEncoder.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\AbsEncoder.c</FilePath>
+            </File>
+            <File>
+              <FileName>Sensor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\Sensor.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -509,6 +519,11 @@
               <FileName>CH340.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\UART\CH340.c</FilePath>
+            </File>
+            <File>
+              <FileName>ESP8266.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\UART\ESP8266.c</FilePath>
             </File>
           </Files>
         </Group>

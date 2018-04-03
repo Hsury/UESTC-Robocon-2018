@@ -114,11 +114,11 @@ void CAN1_RX0_IRQHandler()
         break;
         
         case SLIDER_POS_CAN_ID:
-        //memcpy(&SliderPos, &RxMessage.Data[4], 4);
+        memcpy(&SliderPos, &RxMessage.Data[4], 4);
         break;
         
-        case TONG_POS_CAN_ID:
-        //memcpy(&TongPos, &RxMessage.Data[4], 4);
+        case ROTOR_POS_CAN_ID:
+        memcpy(&RotorPos, &RxMessage.Data[4], 4);
         break;
     }
     // 在这里添加CAN1中断服务函数
@@ -126,12 +126,26 @@ void CAN1_RX0_IRQHandler()
 
 void CAN2_RX0_IRQHandler()
 {
+    BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
     uint32_t TS = millis();
     uint32_t DeltaTS;
     CanRxMsg RxMessage;
     CAN_Receive(CAN2, CAN_FIFO0, &RxMessage);
     switch (RxMessage.StdId)
     {
+        case ABS_ENCODER_COMM_CAN_ID:
+        if (RxMessage.Data[0] == 0x05 && RxMessage.Data[1] == ABS_ENCODER_NODE_CAN_ID && RxMessage.Data[2] == 0x04)
+        {
+            ArmPos = 4095 - (RxMessage.Data[3] | (RxMessage.Data[4] << 8));
+            if (ArmPos >= 2048) ArmPos -= 4095;
+            if (ArmJob == FIRE && ArmPos >= ArmEndPoint)
+            {
+                Elmo_Stop(6);
+                ArmJob = IDLE;
+            }
+        }
+        break;
+        
         case GE_POS_CAN_ID:
         if (GESwitch)
         {
@@ -172,8 +186,31 @@ void CAN2_RX0_IRQHandler()
         Online |= (1 << 5);
         break;
         
-        case KEYBOARD_CAN_ID:;
-        BaseType_t pxHigherPriorityTaskWoken;
+        case DT50_CAN_ID:;
+        int32_t DT50Tmp;
+        memcpy(&DT50Tmp, &RxMessage.Data[0], 4);
+        DT50 = DT50Tmp / 1000.0f;
+        break;
+        
+        case DT35_H_CAN_ID:;
+        int32_t DT35HTmp;
+        memcpy(&DT35HTmp, &RxMessage.Data[0], 4);
+        DT35H = DT35HTmp / 1000.0f + DT35_H_STATIC_DIST;
+        break;
+        
+        case DT35_F_CAN_ID:;
+        int32_t DT35FTmp;
+        memcpy(&DT35FTmp, &RxMessage.Data[0], 4);
+        DT35F = DT35FTmp / 1000.0f + DT35_F_STATIC_DIST;
+        break;
+        
+        case DT35_R_CAN_ID:;
+        int32_t DT35RTmp;
+        memcpy(&DT35RTmp, &RxMessage.Data[0], 4);
+        DT35R = DT35RTmp / 1000.0f + DT35_R_STATIC_DIST;
+        break;
+        
+        case KEYBOARD_CAN_ID:
         switch (RxMessage.Data[0])
         {
             case 0x01: // Report Online Status
@@ -181,32 +218,33 @@ void CAN2_RX0_IRQHandler()
             break;
             
             case 0x05: // SZ => TZ1
-            //vTaskNotifyGiveFromISR(MoveTask_Handler, &pxHigherPriorityTaskWoken);
-            xTaskNotifyFromISR(MoveTask_Handler, 1, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+			xTaskNotifyFromISR(FlowTask_Handler, GET_READY, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            //xTaskNotifyFromISR(MoveTask_Handler, SZ_TZ1, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
             break;
             
             case 0x06: // TZ1 => TZ2
-            xTaskNotifyFromISR(MoveTask_Handler, 2, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+			xTaskNotifyFromISR(FlowTask_Handler, LAUNCH, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            //xTaskNotifyFromISR(MoveTask_Handler, TZ1_TZ2, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
             break;
             
             case 0x07: // TZ2 => TZ3
-            xTaskNotifyFromISR(MoveTask_Handler, 3, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            //xTaskNotifyFromISR(MoveTask_Handler, TZ2_TZ3, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
             break;
             
             case 0x08: // TZ3 => TZ2
-            xTaskNotifyFromISR(MoveTask_Handler, 4, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            //xTaskNotifyFromISR(MoveTask_Handler, TZ3_TZ2, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
             break;
             
-            case 0x09: // TZ1 => TZ2
-            xTaskNotifyFromISR(MoveTask_Handler, 5, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            case 0x09: // SZ => TZ2
+            //xTaskNotifyFromISR(MoveTask_Handler, SZ_TZ2, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
             break;
             
             case 0x0A: // Slider
-            xTaskNotifyFromISR(LoadTask_Handler, 1, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            //xTaskNotifyFromISR(FireTask_Handler, 1, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
             break;
             
             case 0x0B: // Tong
-            xTaskNotifyFromISR(LoadTask_Handler, 2, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            //xTaskNotifyFromISR(FireTask_Handler, 2, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
             break;
             
             case 0xFF: // Reset MCU
@@ -215,8 +253,24 @@ void CAN2_RX0_IRQHandler()
             NVIC_SystemReset();
             break;
         }
-        if (pxHigherPriorityTaskWoken != pdFALSE) taskYIELD();
+        break;
+        
+        case CRADLE_CAN_ID:
+        Move_UpdateZone();
+        if (RxMessage.Data[0] == 0xBB && RxMessage.Data[1] == 0x02 && Zone == TZ1)
+        {
+            xTaskNotifyFromISR(MoveTask_Handler, TZ1_TZ2, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+        }
+        else if (RxMessage.Data[0] == 0xBB && RxMessage.Data[1] == 0x03 && Zone == TZ2)
+        {
+            xTaskNotifyFromISR(MoveTask_Handler, TZ2_TZ3, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+        }
+        else if (RxMessage.Data[0] == 0xEE && RxMessage.Data[1] == 0x01)
+        {
+            vTaskNotifyGiveFromISR(WirelessTask_Handler, &pxHigherPriorityTaskWoken);
+        }
         break;
     }
+    if (pxHigherPriorityTaskWoken != pdFALSE) taskYIELD();
     // 在这里添加CAN2中断服务函数
 }

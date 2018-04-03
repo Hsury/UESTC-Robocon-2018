@@ -13,7 +13,7 @@
                         ===== UESTC Robot Probe For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/03/14
+                                        VERSION 2018/04/02
 
 */
 
@@ -48,15 +48,15 @@ TODO List:
 #include <ESP8266FtpServer.h>
 #include "bitmap.h"
 
-#define HW_NAME "AutoRobot"
-#define SW_NAME "20180314"
+#define HW_NAME "Cast AR"
+#define SW_NAME "20180402"
 
 #define ENABLE_TOUCH_CALIBRATE 0
 #define ENABLE_CAN_DEBUG 0
 #define UPDATE_RTC_TIME 0
 #define NOTIFY_DEVICE_NUM 5
 
-const char* AP_SSID      = "AR_Probe";
+const char* AP_SSID      = "Cast_AR_Probe";
 const char* AP_PASSWORD  = "duoguanriben8";
 
 const char* STA_SSID     = "HsuRY";
@@ -175,7 +175,7 @@ uint32_t Timer[8];
 float Gyroscope;
 float Encoder[2]; // X-Y coordinate
 float GY53[2]; // Array to save the data of GY53s
-int32_t DT35;
+float DT35;
 uint16_t TouchScreen[2]; // X-Y coordinate
 
 boolean isRTC = false;
@@ -592,35 +592,35 @@ void TFTTask(void * pvParameters)
                 tft.setTextDatum(TL_DATUM);
                 tft.drawRect(8, 120, 73, 50, TFT_WHITE);
                 tft.setTextDatum(CC_DATUM);
-                tft.drawString("SZ->TZ1", 44 , 145);
+                tft.drawString("OK", 44 , 145);
                 tft.setTextDatum(TL_DATUM);
                 tft.drawRect(85, 120, 73, 50, TFT_WHITE);
                 tft.setTextDatum(CC_DATUM);
-                tft.drawString("TZ1->TZ2", 121 , 145);
+                tft.drawString("CANCEL", 121 , 145);
                 tft.setTextDatum(TL_DATUM);
                 tft.drawRect(162, 120, 73, 50, TFT_WHITE);
                 tft.setTextDatum(CC_DATUM);
-                tft.drawString("TZ2->TZ3", 198 , 145);
+                tft.drawString("RESET", 198 , 145);
                 tft.setTextDatum(TL_DATUM);
                 tft.drawRect(239, 120, 73, 50, TFT_WHITE);
                 tft.setTextDatum(CC_DATUM);
-                tft.drawString("TZ3->TZ2", 275 , 145);
+                tft.drawString("GO", 275 , 145);
                 tft.setTextDatum(TL_DATUM);
                 tft.drawRect(8, 174, 73, 50, TFT_WHITE);
                 tft.setTextDatum(CC_DATUM);
-                tft.drawString("TZ1->TZ2", 44 , 199);
+                tft.drawString("RETRY", 44 , 199);
                 tft.setTextDatum(TL_DATUM);
                 tft.drawRect(85, 174, 73, 50, TFT_WHITE);
                 tft.setTextDatum(CC_DATUM);
-                tft.drawString("Slider", 121 , 199);
+                tft.drawString("-> TZ1", 121 , 199);
                 tft.setTextDatum(TL_DATUM);
                 tft.drawRect(162, 174, 73, 50, TFT_WHITE);
                 tft.setTextDatum(CC_DATUM);
-                tft.drawString("Tong", 198 , 199);
+                tft.drawString("-> TZ2", 198 , 199);
                 tft.setTextDatum(TL_DATUM);
                 tft.drawRect(239, 174, 73, 50, TFT_WHITE);
                 tft.setTextDatum(CC_DATUM);
-                tft.drawString("Reset MCU", 275 , 199);
+                tft.drawString("-> TZ3", 275 , 199);
                 tft.setTextDatum(TL_DATUM);
                 redraw = false;
             }
@@ -709,7 +709,7 @@ void TFTTask(void * pvParameters)
                 tft.drawString(String(Encoder[1], 3), 160, 108);
                 tft.drawString(String(GY53[0], 3), 160, 132);
                 tft.drawString(String(GY53[1], 3), 160, 156);
-                tft.drawString(String(DT35), 160, 180);
+                tft.drawString(String(DT35, 3), 160, 180);
                 tft.drawString(String(User, 4), 160, 204);
                 tft.setTextFont(2);
                 tft.setTextDatum(TL_DATUM);
@@ -952,7 +952,7 @@ void TFTTask(void * pvParameters)
                 {
                     CAN_tx_frame.MsgID = Keyboard_ID;
                     CAN_tx_frame.FIR.B.DLC = 1;
-                    CAN_tx_frame.data.u8[0] = 0x05;
+                    CAN_tx_frame.data.u8[0] = 0x08;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
                 }
                 else if (xTouch >= 85 && xTouch <= 158 && yTouch >= 120 && yTouch <= 170) // Button 2
@@ -966,42 +966,42 @@ void TFTTask(void * pvParameters)
                 {
                     CAN_tx_frame.MsgID = Keyboard_ID;
                     CAN_tx_frame.FIR.B.DLC = 1;
-                    CAN_tx_frame.data.u8[0] = 0x07;
+                    CAN_tx_frame.data.u8[0] = 0x04;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
                 }
                 else if (xTouch >= 239 && xTouch <= 312 && yTouch >= 120 && yTouch <= 170) // Button 4
                 {
                     CAN_tx_frame.MsgID = Keyboard_ID;
                     CAN_tx_frame.FIR.B.DLC = 1;
-                    CAN_tx_frame.data.u8[0] = 0x08;
+                    CAN_tx_frame.data.u8[0] = 0x02;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
                 }
                 else if (xTouch >= 8 && xTouch <= 81 && yTouch >= 174 && yTouch <= 224) // Button 5
                 {
                     CAN_tx_frame.MsgID = Keyboard_ID;
                     CAN_tx_frame.FIR.B.DLC = 1;
-                    CAN_tx_frame.data.u8[0] = 0x09;
+                    CAN_tx_frame.data.u8[0] = 0x01;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
                 }
                 else if (xTouch >= 85 && xTouch <= 158 && yTouch >= 174 && yTouch <= 224) // Button 6
                 {
                     CAN_tx_frame.MsgID = Keyboard_ID;
                     CAN_tx_frame.FIR.B.DLC = 1;
-                    CAN_tx_frame.data.u8[0] = 0x0A;
+                    CAN_tx_frame.data.u8[0] = 0x07;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
                 }
                 else if (xTouch >= 162 && xTouch <= 235 && yTouch >= 174 && yTouch <= 224) // Button 7
                 {
                     CAN_tx_frame.MsgID = Keyboard_ID;
                     CAN_tx_frame.FIR.B.DLC = 1;
-                    CAN_tx_frame.data.u8[0] = 0x0B;
+                    CAN_tx_frame.data.u8[0] = 0x05;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
                 }
                 else if (xTouch >= 239 && xTouch <= 312 && yTouch >= 174 && yTouch <= 224) // Button 8
                 {
                     CAN_tx_frame.MsgID = Keyboard_ID;
                     CAN_tx_frame.FIR.B.DLC = 1;
-                    CAN_tx_frame.data.u8[0] = 0xFF;
+                    CAN_tx_frame.data.u8[0] = 0x03;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
                 }
                 break;
@@ -1202,7 +1202,8 @@ void CANRecvTask(void * pvParameters)
 
                 case DT35_ID:
                 DeviceNotify[4] = millis();
-                memcpy(&DT35, &CAN_rx_frame.data.u8[0], 4);
+                memcpy(&STmp, &CAN_rx_frame.data.u8[0], 4);
+                DT35 = STmp / 1000.0;
                 break;
 
                 case TouchScreen_ID:

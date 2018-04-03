@@ -12,7 +12,7 @@
 
 
 /* 循环队列参数 */
-#define ELMO_NUM            5                               // Elmo个数,必须严格按照挂载个数的ELMO配置，不得多配置！！！
+#define ELMO_NUM            6                               // Elmo个数,必须严格按照挂载个数的ELMO配置，不得多配置！！！
 #define CAN_BUF_NUM         150                             //缓冲指令条数  改成200了 原来是1000  又减小到了150
 #define CAN_ID_DELAY        0x129                           //延时指令
 
@@ -151,7 +151,7 @@ extern void Elmo_Reinit(uint8_t elmoID);
 /* ELMO控制函数，对外调用 */
 extern uint8_t Elmo_PTM(uint8_t elmoID, float torque);
 extern uint8_t Elmo_PVM(uint8_t elmoID, int32_t speed);  
-extern uint8_t Elmo_PPM(uint8_t elmoID, uint32_t speed, int32_t position, uint8_t PPMmode);		//		POS_ABS  POS_REL 
+extern uint8_t Elmo_PPM(uint8_t elmoID, uint32_t speed, int32_t position, uint8_t PPMmode);        //        POS_ABS  POS_REL 
 extern uint8_t Elmo_Close(uint8_t elmoID);
 extern uint8_t Elmo_Stop(uint8_t elmoID);
 extern uint8_t Elmo_SetAcc(uint8_t elmoID, uint32_t acc, uint32_t dec);

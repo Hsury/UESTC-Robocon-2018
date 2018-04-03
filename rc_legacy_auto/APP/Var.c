@@ -2,7 +2,7 @@
 
 uint32_t Online = 0x00000000;
 
-uint8_t Zone = 0;
+uint8_t Zone = SZ;
 
 float RealAccX = 0;
 float RealAccY = 0;
@@ -26,3 +26,9 @@ float GoalZ = 0;
 
 float GY53A = 0;
 float GY53B = 0;
+
+float DT50 = 0;
+
+float DT35H = 0;
+float DT35F = 0;
+float DT35R = 0;

@@ -1,7 +1,7 @@
 #ifndef __VAR_H
 #define __VAR_H
 
-#include "stdint.h"
+#include "Includes.h"
 
 extern uint32_t Online;
 
@@ -29,5 +29,11 @@ extern float GoalZ;
 
 extern float GY53A;
 extern float GY53B;
+
+extern float DT50;
+
+extern float DT35H;
+extern float DT35F;
+extern float DT35R;
 
 #endif

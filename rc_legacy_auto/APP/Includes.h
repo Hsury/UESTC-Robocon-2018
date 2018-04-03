@@ -1,7 +1,13 @@
 #ifndef __INCLUDES_H
 #define __INCLUDES_H
 
+#define ENABLE_SLING_DEBUG 0
+#define ENABLE_ACC_REPORT 0
+#define ENABLE_VEL_REPORT 0
+#define ENABLE_POS_REPORT 0
+
 // C Level
+#include "stdarg.h"
 #include "stdbool.h"
 #include "stdlib.h"
 #include "stdint.h"
@@ -16,11 +22,13 @@
 #include "usart.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "semphr.h"
 
 // Peripheral Level
 #include "CAN.h"
 #include "AirUART.h"
 #include "CH340.h"
+#include "ESP8266.h"
 #include "usbd_cdc_core.h"
 #include "usbd_usr.h"
 #include "usb_conf.h"
@@ -33,12 +41,15 @@
 #include "RGBLED.h"
 #include "GY53.h"
 #include "Cylinder.h"
+#include "Sensor.h"
 
 // CAN Level
 #include "Elmo.h"
 #include "GyroEncoder.h"
 #include "Probe.h"
-#include "Loader.h"
+#include "Cradle.h"
+#include "Sling.h"
+#include "AbsEncoder.h"
 
 // Application Level
 #include "Algorithm.h"
