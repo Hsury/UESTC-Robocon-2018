@@ -53,6 +53,7 @@ void UART4_IRQHandler(void)
     if (USART_GetITStatus(UART4, USART_IT_RXNE) != RESET) //接收中断
     {
         tmp = USART_ReceiveData(UART4); //(UART4->DR);
+        if (tmp == 0xAB) Cradle_RetryNotify(Zone);
         RingBuf_Overwrite(&ESP8266_RingBuf, &tmp);
         Checkout(&ESP8266_RingBuf);
         char AT_Response[4];
@@ -87,6 +88,7 @@ bool ESP8266_UARTConfig(uint32_t Baudrate)
     //8 bit数据位，1 bit停止位，无校验位，不使能流控
     xSemaphoreTake(ATOKSemaphore, 0);
     Printf(ESP8266, "AT+UART_DEF=%u,8,1,0,0\r\n", Baudrate);
+    delay_ms(100);
     if (xSemaphoreTake(ATOKSemaphore, pdMS_TO_TICKS(15000)) == pdTRUE)
     {
         USART_Cmd(UART4, DISABLE);
@@ -99,6 +101,7 @@ bool ESP8266_UARTConfig(uint32_t Baudrate)
         USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
         USART_Init(UART4, &USART_InitStructure);
         USART_Cmd(UART4, ENABLE);
+        delay_ms(100);
         return true;
     }
     else return false;
@@ -108,6 +111,7 @@ bool ESP8266_WiFiModeConfig(uint8_t Mode)
 {
     xSemaphoreTake(ATOKSemaphore, 0);
     Printf(ESP8266, "AT+CWMODE_DEF=%u\r\n", Mode);
+    delay_ms(100);
     if (xSemaphoreTake(ATOKSemaphore, pdMS_TO_TICKS(15000)) == pdTRUE) return true;
     else return false;
 }
@@ -116,6 +120,7 @@ bool ESP8266_StationConfig(char *SSID, char *Password)
 {
     xSemaphoreTake(ATOKSemaphore, 0);
     Printf(ESP8266, "AT+CWJAP_DEF=\"%s\",\"%s\"\r\n", SSID, Password);
+    delay_ms(100);
     if (xSemaphoreTake(ATOKSemaphore, pdMS_TO_TICKS(15000)) == pdTRUE) return true;
     else return false;
 }
@@ -124,6 +129,7 @@ bool ESP8266_StationDHCPConfig(bool isEnable)
 {
     xSemaphoreTake(ATOKSemaphore, 0);
     Printf(ESP8266, "AT+CWDHCP_DEF=1,%u\r\n", isEnable);
+    delay_ms(100);
     if (xSemaphoreTake(ATOKSemaphore, pdMS_TO_TICKS(15000)) == pdTRUE) return true;
     else return false;
 }
@@ -132,6 +138,7 @@ bool ESP8266_StationIPConfig(char *IPAddress, char *Gateway, char *Netmask)
 {
     xSemaphoreTake(ATOKSemaphore, 0);
     Printf(ESP8266, "AT+CIPSTA_DEF=\"%s\",\"%s\",\"%s\"\r\n", IPAddress, Gateway, Netmask);
+    delay_ms(100);
     if (xSemaphoreTake(ATOKSemaphore, pdMS_TO_TICKS(15000)) == pdTRUE) return true;
     else return false;
 }
@@ -140,6 +147,7 @@ bool ESP8266_SoftAPConfig(char *SSID, char *Password, uint8_t Channel, uint8_t E
 {
     xSemaphoreTake(ATOKSemaphore, 0);
     Printf(ESP8266, "AT+CWSAP_DEF=\"%s\",\"%s\",%u,%u,%u,%u\r\n", SSID, Password, Channel, Encryption, MaxConn, HideSSID);
+    delay_ms(100);
     if (xSemaphoreTake(ATOKSemaphore, pdMS_TO_TICKS(15000)) == pdTRUE) return true;
     else return false;
 }
@@ -148,6 +156,7 @@ bool ESP8266_TransLinkConfig(char *IPAddress, uint16_t RemotePort, uint8_t Proto
 {
     xSemaphoreTake(ATOKSemaphore, 0);
     Printf(ESP8266, "AT+SAVETRANSLINK=1,\"%s\",%u,\"%s\",%u\r\n", IPAddress, RemotePort, Protocol == UDP ? "UDP" : "TCP", LocalPort);
+    delay_ms(100);
     if (xSemaphoreTake(ATOKSemaphore, pdMS_TO_TICKS(15000)) == pdTRUE) return true;
     else return false;
 }
@@ -156,6 +165,7 @@ bool ESP8266_Reset()
 {
     xSemaphoreTake(ATOKSemaphore, 0);
     Printf(ESP8266, "AT+RST\r\n");
+    delay_ms(100);
     if (xSemaphoreTake(ATOKSemaphore, pdMS_TO_TICKS(15000)) == pdTRUE) return true;
     else return false;
 }

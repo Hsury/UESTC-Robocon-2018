@@ -21,6 +21,7 @@ enum ZONE
 
 enum PATH
 {
+    LOCKPOINT = 0, 
     SZ_TZ1 = 1, 
     TZ1_TZ2 = 2, 
     TZ2_TZ3 = 3, 

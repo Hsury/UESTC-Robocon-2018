@@ -58,8 +58,9 @@ void TIM2_IRQHandler()
             Data |= PCin(0);
         }
         ArmPos = Data;
-        if (ArmJob == FIRE && ArmPos >= ArmEndPoint)
+        if (ArmJob == FIRE && fabs(ArmPos - ArmEndPoint) < 100 && ArmPos >= ArmEndPoint)
         {
+            //printf("ArmPos = %.1f\r\n", ArmPos);
             Elmo_Stop(6);
             ArmJob = IDLE;
         }

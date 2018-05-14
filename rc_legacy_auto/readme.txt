@@ -13,6 +13,6 @@
                      ===== UESTC Legacy Auto Robot For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/03/15
+                                        VERSION 2018/04/16
 
 */

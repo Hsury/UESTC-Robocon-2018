@@ -13,7 +13,7 @@
                         ===== UESTC Robot Probe For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/04/02
+                                        VERSION 2018/05/14
 
 */
 
@@ -27,6 +27,7 @@ TODO List:
 */
 
 #include <Arduino.h>
+#include <FreeRTOS/timers.h>
 #include <WiFi.h>
 #include <ESP32CAN.h>
 #include <CAN_config.h>
@@ -48,19 +49,29 @@ TODO List:
 #include <ESP8266FtpServer.h>
 #include "bitmap.h"
 
-#define HW_NAME "Cast AR"
-#define SW_NAME "20180402"
+#define HW_NAME "AR"
+#define SW_NAME "2018/05/14"
 
+#define USE_STATIC_IP_ADDRESS 0
 #define ENABLE_TOUCH_CALIBRATE 0
 #define ENABLE_CAN_DEBUG 0
 #define UPDATE_RTC_TIME 0
-#define NOTIFY_DEVICE_NUM 5
+#define NOTIFY_DEVICE_NUM 4
 
-const char* AP_SSID      = "Cast_AR_Probe";
-const char* AP_PASSWORD  = "duoguanriben8";
+const char* AP_SSID      = "AR_Probe";
+const char* AP_PASSWORD  = "***REMOVED***";
 
-const char* STA_SSID     = "HsuRY";
+const char* STA_SSID     = "Robocon-WiFi";
 const char* STA_PASSWORD = "***REMOVED***";
+
+#if USE_STATIC_IP_ADDRESS
+IPAddress LOCAL_IP(192, 168, 1, 45);
+IPAddress GATEWAY(192, 168, 1, 1);
+IPAddress SUBNET(255, 255, 255, 0);
+#endif
+
+const char * UDP_ADDRESS = "192.168.1.255";
+const int UDP_PORT = 2019;
 
 struct ProbeConfig
 {
@@ -100,15 +111,14 @@ P.P.S. TFT and Touchscreen are using VSPI, transactions (To work with other devi
 
 #define Gyroscope_ID 0x11
 #define Encoder_ID 0x12
-#define GY53_A_ID 0x21
-#define GY53_B_ID 0x22
-#define DT35_ID 0x23
+#define DT35_X_ID 0x26
+#define DT35_Y_ID 0x24
 #define Keyboard_ID 0x30
-#define TouchScreen_ID 0x60
+#define MR_ID 0x71
 #define Cradle_ID 0x72
 #define Hint_Tone_ID 0x74
 #define Online_ID 0xA0
-#define User_ID 0xA1
+#define Custom_ID 0xA1
 #define Timer_ID 0xA2
 
 /*
@@ -134,13 +144,16 @@ CAN_frame_t CAN_rx_frame;
 CAN_frame_t CAN_tx_frame;
 uint32_t packNum;
 
+WiFiUDP udp;
+
 SPIClass SPI2(HSPI); // In order to make full use of the chip and not to meet FreeRTOS task conflict with TFT, enable HSPI (HSPI = SPI2; VSPI = SPI3, Default)
 HardwareSerial Serial1(1);  // UART1/Serial1 pins 9, 10
 HardwareSerial Serial2(2);  // UART2/Serial2 pins 16, 17
 
-DS3232RTC RTC; // Need to be instanced manually
+DS3232RTC RTC(false); // I2C need to be instanced manually
 BY8X0116P audioController(Serial2, AUDIO_BUSY_PIN);
 TFT_eSPI tft = TFT_eSPI();
+TFT_eSprite heartbeatSprite = TFT_eSprite(&tft);
 RemoteDebug Debug;
 FtpServer ftpSrv;
 
@@ -156,27 +169,32 @@ TaskHandle_t CANRecvTaskHandle;
 TaskHandle_t UARTRecvTaskHandle;
 TaskHandle_t TestTaskHandle;
 TaskHandle_t RobotSelftestTaskHandle;
+TaskHandle_t HeartbeatAnimeTaskHandle;
+
+TimerHandle_t PingTimerHandle;
+TimerHandle_t RSSITimerHandle;
 
 SemaphoreHandle_t RTCUpdateSemaphoreHandle;
+SemaphoreHandle_t HeartbeatAnimeUpdateSemaphoreHandle;
+SemaphoreHandle_t RSSIUpdateSemaphoreHandle;
+SemaphoreHandle_t OnlineUpdateSemaphoreHandle;
 
 xQueueHandle AudioFIFO;
 xQueueHandle SerialFIFO;
 
 char BootTimePrefix[21]; // xxxx_xx_xx_xx_xx_xx_\0
 
-//To learn more about Arduino String Class, see also https://hackingmajenkoblog.wordpress.com/2016/02/04/the-evils-of-arduino-strings/
+// To learn more about Arduino String Class, see also https://hackingmajenkoblog.wordpress.com/2016/02/04/the-evils-of-arduino-strings/
 String LogHistory[13 * 20]; // Record for 20 pages at most
 uint16_t LogPtr = 0;
 
 uint32_t DeviceNotify[NOTIFY_DEVICE_NUM];
 uint32_t Online;
-float User;
+float Custom;
 uint32_t Timer[8];
 float Gyroscope;
 float Encoder[2]; // X-Y coordinate
-float GY53[2]; // Array to save the data of GY53s
-float DT35;
-uint16_t TouchScreen[2]; // X-Y coordinate
+float DT35[2]; // X-Y coordinate
 
 boolean isRTC = false;
 boolean isWiFiConnected = false;
@@ -193,6 +211,11 @@ void CANRecvTask(void * pvParameters);
 void UARTRecvTask(void * pvParameters);
 void TestTask(void * pvParameters);
 void RobotSelftestTask(void * pvParameters);
+void HeartbeatAnimeTask(void * pvParameters);
+
+void PingTimerCallback(TimerHandle_t xTimer);
+void RSSITimerCallback(TimerHandle_t xTimer);
+
 void processCmdRemoteDebug();
 void AddToPlaylist(uint8_t index);
 void TouchscreenCalibrate();
@@ -200,6 +223,7 @@ void readConfig();
 void writeConfig();
 
 void Log(const char * format, ...);
+uint16_t Rainbow(uint8_t Value);
 
 void setup() {
     Serial.begin(921600);
@@ -212,13 +236,16 @@ void setup() {
     SPI2.begin(HSPI_SCLK_PIN, HSPI_MISO_PIN, HSPI_MOSI_PIN);
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN); // Specify I2C Pins here instead of in RTC library
 
-    CAN_cfg.speed = CAN_SPEED_1000KBPS; // Set CAN Bus speed to 1Mbps
-    CAN_cfg.tx_pin_id = CAN_TX_PIN; // Set CAN TX Pin
-    CAN_cfg.rx_pin_id = CAN_RX_PIN; // Set CAN RX Pin
-    CAN_cfg.rx_queue = xQueueCreate(16, sizeof(CAN_frame_t)); // Create CAN RX Queue
-    ESP32Can.CANInit(); // Start CAN module
+    Log("Hardware: %s", HW_NAME);
+    Log("Software: %s", SW_NAME);
 
     setSyncProvider(RTC.get); // Try to sync with RTC
+    if (timeStatus() == timeSet) // Check RTC sync status
+    {
+        isRTC = true;
+        Log("RTC module initialized");
+    }
+    else Log("RTC module not initialized");
     Log("Boot time: %4d/%02d/%02d %02d:%02d:%02d", year(), month(), day(), hour(), minute(), second());
     sprintf(BootTimePrefix, "%4d_%02d_%02d_%02d_%02d_%02d_", year(), month(), day(), hour(), minute(), second());
 
@@ -250,13 +277,6 @@ void setup() {
 
     if (SPIFFS.begin(true)) Log("SPIFFS mounted"); // Format SPIFFS on fail is enabled
     readConfig(); // Load config
-
-    if (timeStatus() == timeSet) // Check RTC sync status
-    {
-        isRTC = true;
-        Log("RTC module started");
-    }
-    else Log("RTC module not started");
 
     WiFi.softAP(AP_SSID, AP_PASSWORD, 1, config.hideSSID); // Begin AP mode
     WiFi.softAPsetHostname(HW_NAME);
@@ -292,14 +312,32 @@ void setup() {
         });
     ArduinoOTA.setMdnsEnabled(false); // If WiFi is not in STA connected status, mDNS fails to start, so disable here
     ArduinoOTA.begin(); // Allow OTA process in AP Mode, default port is 3232
+    Log("OTA service started");
 
     if (isSDCardInserted)
     {
         ftpSrv.begin("uestc", "robocon"); // Enable a simple file-only FTP server if SD Card was inserted
-        Log("FTP server started");
+        Log("FTP service started");
         Log(" - Username: uestc");
         Log(" - Password: robocon");
     }
+
+    Debug.begin(HW_NAME); // Initiaze the telnet server
+    Debug.setResetCmdEnabled(true); // Enable the reset command
+    String helpCmd = "demo - Try different levels of debug message\r\n";
+	helpCmd.concat("count - Drive the speaker to count from 1 to 4\r\n");
+    helpCmd.concat("r11 - Send TZ1 1st retry command to cradle\r\n");
+    helpCmd.concat("r12 - Send TZ1 2nd retry command to cradle\r\n");
+    helpCmd.concat("r21 - Send TZ2 1st retry command to cradle");
+	Debug.setHelpProjectsCmds(helpCmd);
+	Debug.setCallBackProjectCmds(&processCmdRemoteDebug);
+    Log("Telnet service started");
+
+    audioController.init(); // Initialize BY8301-16P module
+    audioController.setVolume(config.volume);
+    audioController.stop();
+    //audioController.printModuleInfo();
+    Log("Audio service started");
 
     tft.init();
     tft.setRotation(1);
@@ -312,40 +350,30 @@ void setup() {
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setTextFont(2);
 
-    audioController.init(); // Initialize BY8301-16P module
-    audioController.setVolume(config.volume);
-    audioController.stop();
-    //audioController.printModuleInfo();
-
-    Debug.begin(HW_NAME); // Initiaze the telnet server
-    Debug.setResetCmdEnabled(true); // Enable the reset command
-    String helpCmd = "play - Drive the speaker\r\n";
-	helpCmd.concat("uestc - emmmm");
-	Debug.setHelpProjectsCmds(helpCmd);
-	Debug.setCallBackProjectCmds(&processCmdRemoteDebug);
-
-    NTP.onNTPSyncEvent ([](NTPSyncEvent_t event)
-    {
-        if (event == timeSyncd)
-        {
-            Log("Got NTP time: %s", NTP.getTimeDateString(NTP.getLastNTPSync()).c_str());
-            #if UPDATE_RTC_TIME
-            if (isRTC) xSemaphoreGive(RTCUpdateSemaphoreHandle);
-            #endif
-        }
-        else if (event == noResponse) Log("Time sync error: NTP server not reachable");
-        else if (event == invalidAddress) Log("Time sync error: Invalid NTP server address");
-    });
+    heartbeatSprite.createSprite(35, 24);
+    heartbeatSprite.fillSprite(TFT_BLACK);
 
     /*
     pinMode(TFT_PEN_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(TFT_PEN_PIN), TouchISR, FALLING);
     */
 
+    CAN_cfg.speed = CAN_SPEED_1000KBPS; // Set CAN Bus speed to 1Mbps
+    CAN_cfg.tx_pin_id = CAN_TX_PIN; // Set CAN TX Pin
+    CAN_cfg.rx_pin_id = CAN_RX_PIN; // Set CAN RX Pin
+    CAN_cfg.rx_queue = xQueueCreate(16, sizeof(CAN_frame_t)); // Create CAN RX Queue
+    ESP32Can.CANInit(); // Start CAN module
+
     RTCUpdateSemaphoreHandle = xSemaphoreCreateBinary();
+    HeartbeatAnimeUpdateSemaphoreHandle = xSemaphoreCreateBinary();
+    RSSIUpdateSemaphoreHandle = xSemaphoreCreateBinary();
+    OnlineUpdateSemaphoreHandle = xSemaphoreCreateBinary();
 
     AudioFIFO = xQueueCreate(32, sizeof(uint8_t)); // Create a FIFO to buffer the playing request
     SerialFIFO = xQueueCreate(2048, sizeof(char)); // Create a FIFO to buffer Serial data
+
+    PingTimerHandle = xTimerCreate("Ping Timer", pdMS_TO_TICKS(500), pdTRUE, (void *)1, PingTimerCallback);
+    RSSITimerHandle = xTimerCreate("RSSI Timer", pdMS_TO_TICKS(500), pdTRUE, (void *)2, RSSITimerCallback);
 
     // NOTE: My principle to arrange the priority of tasks is up to the delay in the task, the longer delay, the first you go
     xTaskCreate(WiFiStationTask, "WiFi Station Config", 4096, NULL, 4, &WiFiStationTaskHandle);
@@ -354,11 +382,81 @@ void setup() {
     xTaskCreate(CANRecvTask, "CAN Bus Receive", 4096, NULL, 1, &CANRecvTaskHandle);
     xTaskCreate(UARTRecvTask, "UART Receive", 4096, NULL, 1, &UARTRecvTaskHandle);
     xTaskCreate(TestTask, "Priority Test", 4096, NULL, 1, &TestTaskHandle);
+    xTaskCreate(HeartbeatAnimeTask, "Heartbeat Anime Task", 2048, NULL, 1, &HeartbeatAnimeTaskHandle);
+
+    xTimerStart(RSSITimerHandle, 0);
 
     AddToPlaylist(1); // Play OS started tone
 }
 
 void loop() {
+    if (isWiFiConnected && udp.parsePacket())
+    {
+        xTaskNotifyGive(HeartbeatAnimeTaskHandle);
+        while (udp.available())
+        {
+            uint8_t tmp = udp.read();
+            if (tmp == 0x11) // Retry command from MR received
+            {
+                CAN_tx_frame.MsgID = Cradle_ID;
+                CAN_tx_frame.FIR.B.DLC = 2;
+                CAN_tx_frame.data.u8[0] = 0xFF;
+                CAN_tx_frame.data.u8[1] = 0x11;
+                ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                udp.beginPacket(UDP_ADDRESS, UDP_PORT);
+                udp.write(0xAC);
+                udp.endPacket();
+                Log("TZ1 1st retry command sent to cradle");
+            }
+            else if (tmp == 0x12)
+            {
+                CAN_tx_frame.MsgID = Cradle_ID;
+                CAN_tx_frame.FIR.B.DLC = 2;
+                CAN_tx_frame.data.u8[0] = 0xFF;
+                CAN_tx_frame.data.u8[1] = 0x12;
+                ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                udp.beginPacket(UDP_ADDRESS, UDP_PORT);
+                udp.write(0xAC);
+                udp.endPacket();
+                Log("TZ1 2nd retry command sent to cradle");
+            }
+            else if (tmp == 0x21)
+            {
+                CAN_tx_frame.MsgID = Cradle_ID;
+                CAN_tx_frame.FIR.B.DLC = 2;
+                CAN_tx_frame.data.u8[0] = 0xFF;
+                CAN_tx_frame.data.u8[1] = 0x21;
+                ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                udp.beginPacket(UDP_ADDRESS, UDP_PORT);
+                udp.write(0xAC);
+                udp.endPacket();
+                Log("TZ2 1st retry command sent to cradle");
+            }
+            else if (tmp == 0xA0)
+            {
+                CAN_tx_frame.MsgID = MR_ID;
+                CAN_tx_frame.FIR.B.DLC = 2;
+                CAN_tx_frame.data.u8[0] = 0xFF;
+                CAN_tx_frame.data.u8[1] = 0xA0;
+                ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                Log("Throw notification from AR received");
+            }
+            else if (tmp == 0xAC)
+            {
+                CAN_tx_frame.MsgID = MR_ID;
+                CAN_tx_frame.FIR.B.DLC = 2;
+                CAN_tx_frame.data.u8[0] = 0xFF;
+                CAN_tx_frame.data.u8[1] = 0xAC;
+                ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                Log("Retry ACK from AR received");
+            }
+            else continue;
+            audioController.stop();
+            audioController.playFileIndex(2);
+            udp.flush(); // Necessary
+            break;
+        }
+    }
     ArduinoOTA.handle();
     Debug.handle();
     ftpSrv.handleFTP();
@@ -369,79 +467,72 @@ void loop() {
         Log("RTC time updated");
     }
     #endif
-    delay(50); // Maybe we can use yield() to take place of it
+    //delay(50); // Maybe we can use yield() to take place of it
 }
 
 void WiFiStationTask(void * pvParameters)
 {
     WiFi.begin(STA_SSID, STA_PASSWORD); // Begin STA mode
+    #if USE_STATIC_IP_ADDRESS
+    WiFi.config(LOCAL_IP, GATEWAY, SUBNET);
+    #endif
     WiFi.setHostname(HW_NAME);
     uint32_t WiFiTimeout = millis() + 3E4; // Set WiFi STA connection timeout to 30 seconds
-    while (WiFi.status() != WL_CONNECTED && millis() < WiFiTimeout)
-    {
-        delay(500); // RTOS delay function: vTaskDelay(pdMS_TO_TICKS(xms)), it seems that delay() acts the same to it
-    }
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        isWiFiConnected = true;
-        IPAddress STAIP = WiFi.localIP();
-        Log("WiFi connected");
-        Log(" - SSID: %s", STA_SSID);
-        Log(" - IP: %u.%u.%u.%u", STAIP[0], STAIP[1], STAIP[2], STAIP[3]);
-        ArduinoOTA.end();
-        ArduinoOTA.setHostname(HW_NAME); // Equals to the parameter in function MDNS.begin(HW_NAME)
-        ArduinoOTA.setMdnsEnabled(true); // Now STA connected, restart OTA here to enable mDNS
-        ArduinoOTA.begin();
-        MDNS.addService("telnet", "tcp", 23); // Telnet service (RemoteDebug)
-        if (!isRTC || UPDATE_RTC_TIME)
-        {
-            NTP.begin("time1.aliyun.com", 8);
-            NTP.setInterval(10, 60);
-            Log("NTP service started");
-        }
-        AddToPlaylist(2); // Play prefix tone
-        AddToPlaylist(3); // Play WiFi Station connected tone
-    }
+    while (WiFi.status() != WL_CONNECTED && millis() < WiFiTimeout) delay(500); // RTOS delay function: vTaskDelay(pdMS_TO_TICKS(xms)), it seems that delay() acts the same to it
+    if (WiFi.status() == WL_CONNECTED) goto Connected;
     else
     {
         Log("WiFi connected failed, SmartConfig begin");
         WiFi.beginSmartConfig();
-        while (!WiFi.smartConfigDone()) // SmartConfig packet received
-        {
-            delay(500);
-        }
+        while (!WiFi.smartConfigDone()) delay(500); // SmartConfig packet received
         Log("SmartConfig received");
         WiFiTimeout = millis() + 3E4;
-        while (WiFi.status() != WL_CONNECTED && millis() < WiFiTimeout)
-        {
-            delay(500);
-        }
-        if (WiFi.status() == WL_CONNECTED)
-        {
-            isWiFiConnected = true;
-            IPAddress STAIP = WiFi.localIP();
-            Log("WiFi connected");
-            Log(" - IP: %u.%u.%u.%u", STAIP[0], STAIP[1], STAIP[2], STAIP[3]);
-            ArduinoOTA.end();
-            ArduinoOTA.setHostname(HW_NAME); // Equals to the parameter in function MDNS.begin(HW_NAME)
-            ArduinoOTA.setMdnsEnabled(true); // Now STA connected, restart OTA here to enable mDNS
-            ArduinoOTA.begin();
-            MDNS.addService("telnet", "tcp", 23); // Telnet service (RemoteDebug)
-            if (!isRTC || UPDATE_RTC_TIME)
-            {
-                NTP.begin("time1.aliyun.com", 8);
-                NTP.setInterval(10, 60);
-                Log("NTP service started");
-            }
-            AddToPlaylist(2); // Play prefix tone
-            AddToPlaylist(3); // Play WiFi Station connected tone
-        }
+        while (WiFi.status() != WL_CONNECTED && millis() < WiFiTimeout) delay(500);
+        if (WiFi.status() == WL_CONNECTED) goto Connected;
         else
         {
-            Log("WiFi connected failed, Stop");
+            Log("WiFi connected failed, stop retrying");
             WiFi.mode(WIFI_AP);
         }
     }
+    vTaskDelete(NULL);
+
+    Connected:
+    isWiFiConnected = true;
+    IPAddress STAIP = WiFi.localIP();
+    Log("WiFi connected");
+    Log(" - SSID: %s", STA_SSID);
+    Log(" - IP: %u.%u.%u.%u", STAIP[0], STAIP[1], STAIP[2], STAIP[3]);
+    udp.begin(UDP_PORT);
+    xTimerStart(PingTimerHandle, 0);
+    Log("UDP transfer started");
+    Log(" - Target IP: %s", UDP_ADDRESS);
+    Log(" - Target Port: %d", UDP_PORT);
+    ArduinoOTA.end();
+    ArduinoOTA.setHostname(HW_NAME); // Equals to the parameter in function MDNS.begin(HW_NAME)
+    ArduinoOTA.setMdnsEnabled(true); // Now STA connected, restart OTA here to enable mDNS
+    ArduinoOTA.begin();
+    MDNS.addService("telnet", "tcp", 23); // Telnet service (RemoteDebug)
+    if (!isRTC || UPDATE_RTC_TIME)
+    {
+        NTP.onNTPSyncEvent ([](NTPSyncEvent_t event)
+        {
+            if (event == timeSyncd)
+            {
+                Log("Got NTP time: %s", NTP.getTimeDateString(NTP.getLastNTPSync()).c_str());
+                #if UPDATE_RTC_TIME
+                if (isRTC) xSemaphoreGive(RTCUpdateSemaphoreHandle);
+                #endif
+            }
+            else if (event == noResponse) Log("Time sync error: NTP server not reachable");
+            else if (event == invalidAddress) Log("Time sync error: Invalid NTP server address");
+        });
+        Log("NTP service started");
+        NTP.begin("ntp7.aliyun.com", 8);
+        NTP.setInterval(30, 600);
+    }
+    AddToPlaylist(2); // Play prefix tone
+    AddToPlaylist(3); // Play WiFi Station connected tone
     vTaskDelete(NULL);
 }
 
@@ -469,6 +560,7 @@ void AudioTask(void * pvParameters)
     017 已到达TZ2.wav
     018 已到达TZ3.wav
     019 我来扔个球.wav
+    020 老铁，我准备好啦.wav
     */
     
     while (1)
@@ -527,8 +619,7 @@ void TFTTask(void * pvParameters)
             if (redraw)
             {
                 tft.pushImage(0, 0, 320, 240, bitmap_main);
-                tft.setCursor(0, 0);
-                tft.printf("HW: %s\r\nSW: %s\r\nMS:", HW_NAME, SW_NAME);
+                tft.pushImage(0, 0, 168, 24, bitmap_uestc_banner);
                 redraw = false;
             }
             if (isWiFiConnected) tft.pushImage(320 - 24, 0, 24, 24, bitmap_wifi_connected);
@@ -550,12 +641,12 @@ void TFTTask(void * pvParameters)
                 trayPos++;
             }
             tft.fillRect(320 - 24 * (5 + 1), 0, 24 * (5 - trayPos + 1), 24, TFT_BLACK); // Erase icons left, assumes that the maximum number of icons is 5 (exclude WiFi)
-            tft.setCursor(27, 32);
-            tft.printf("%u", millis());
             char clockStr[20];
             sprintf(clockStr, "%4d/%02d/%02d %02d:%02d:%02d", year(), month(), day(), hour(), minute(), second());
-            tft.setTextDatum(TR_DATUM);
-            tft.drawString(clockStr, 319, 32);
+            tft.setTextColor(Rainbow(millis() / 39), TFT_BLACK);
+            tft.setTextDatum(TC_DATUM);
+            tft.drawString(clockStr, 160, 32);
+            tft.setTextColor(TFT_WHITE, TFT_BLACK);
             tft.setTextDatum(TL_DATUM);
             break;
 
@@ -564,15 +655,19 @@ void TFTTask(void * pvParameters)
             {
                 tft.fillScreen(TFT_BLACK);
                 tft.pushImage(0, 0, 32, 32, bitmap_home, TFT_BLACK);
+                tft.pushImage(44, 3, 168, 24, bitmap_uestc_banner);
+                /*
                 tft.setTextSize(2);
                 tft.setTextDatum(CC_DATUM);
                 tft.drawString("ROBOT CTRL PANEL", 176 , 16);
                 tft.setTextDatum(TL_DATUM);
                 tft.setTextSize(1);
                 //tft.pushImage(288, 0, 32, 32, bitmap_refresh, TFT_BLACK);
-                tft.setFreeFont(&FreeSans9pt7b);
+                */
+                tft.loadFont("Chinese");
+
                 tft.setTextDatum(C_BASELINE);
-                tft.drawString("Elmo", 98 , 50);
+                tft.drawString("电机", 98 , 50);
                 tft.drawLine(98, 56, 98, 60, TFT_WHITE);
                 tft.drawLine(26, 60, 170, 60, TFT_WHITE);
                 tft.drawLine(26, 60, 26, 68, TFT_WHITE);
@@ -580,66 +675,74 @@ void TFTTask(void * pvParameters)
                 tft.drawLine(98, 60, 98, 68, TFT_WHITE);
                 tft.drawLine(134, 60, 134, 68, TFT_WHITE);
                 tft.drawLine(170, 60, 170, 68, TFT_WHITE);
-                tft.drawString("Gyro", 214 , 50);
+                tft.drawString("惯导", 214 , 50);
                 tft.drawLine(214, 56, 214, 60, TFT_WHITE);
                 tft.drawLine(214, 60, 214, 68, TFT_WHITE);
-                tft.drawString("Laser", 276 , 50);
+                tft.drawString("激光", 276 , 50);
                 tft.drawLine(276, 56, 276, 60, TFT_WHITE);
                 tft.drawLine(258, 60, 294, 60, TFT_WHITE);
                 tft.drawLine(258, 60, 258, 68, TFT_WHITE);
                 tft.drawLine(294, 60, 294, 68, TFT_WHITE);
-                tft.setTextFont(2);
-                tft.setTextDatum(TL_DATUM);
-                tft.drawRect(8, 120, 73, 50, TFT_WHITE);
+
                 tft.setTextDatum(CC_DATUM);
-                tft.drawString("OK", 44 , 145);
+                tft.drawRect(8, 128, 73, 50, TFT_WHITE);
+                tft.drawString("预备", 44 , 153);
+                tft.drawRect(85, 128, 73, 50, TFT_WHITE);
+                tft.drawString("吸地", 121 , 153);
+                tft.drawRect(162, 128, 73, 50, TFT_WHITE);
+                tft.drawString("复位", 198 , 153);
+                tft.drawRect(239, 128, 73, 50, TFT_WHITE);
+                tft.drawString("发射", 275 , 153);
+                tft.drawRect(8, 182, 73, 50, TFT_WHITE);
+                tft.drawString("重试", 44 , 207);
+                tft.drawRect(85, 182, 73, 50, TFT_WHITE);
+                tft.drawString("到TZ1", 121 , 207);
+                tft.drawRect(162, 182, 73, 50, TFT_WHITE);
+                tft.drawString("到TZ2", 198 , 207);
+                tft.drawRect(239, 182, 73, 50, TFT_WHITE);
+                tft.drawString("到TZ3", 275 , 207);
                 tft.setTextDatum(TL_DATUM);
-                tft.drawRect(85, 120, 73, 50, TFT_WHITE);
-                tft.setTextDatum(CC_DATUM);
-                tft.drawString("CANCEL", 121 , 145);
-                tft.setTextDatum(TL_DATUM);
-                tft.drawRect(162, 120, 73, 50, TFT_WHITE);
-                tft.setTextDatum(CC_DATUM);
-                tft.drawString("RESET", 198 , 145);
-                tft.setTextDatum(TL_DATUM);
-                tft.drawRect(239, 120, 73, 50, TFT_WHITE);
-                tft.setTextDatum(CC_DATUM);
-                tft.drawString("GO", 275 , 145);
-                tft.setTextDatum(TL_DATUM);
-                tft.drawRect(8, 174, 73, 50, TFT_WHITE);
-                tft.setTextDatum(CC_DATUM);
-                tft.drawString("RETRY", 44 , 199);
-                tft.setTextDatum(TL_DATUM);
-                tft.drawRect(85, 174, 73, 50, TFT_WHITE);
-                tft.setTextDatum(CC_DATUM);
-                tft.drawString("-> TZ1", 121 , 199);
-                tft.setTextDatum(TL_DATUM);
-                tft.drawRect(162, 174, 73, 50, TFT_WHITE);
-                tft.setTextDatum(CC_DATUM);
-                tft.drawString("-> TZ2", 198 , 199);
-                tft.setTextDatum(TL_DATUM);
-                tft.drawRect(239, 174, 73, 50, TFT_WHITE);
-                tft.setTextDatum(CC_DATUM);
-                tft.drawString("-> TZ3", 275 , 199);
-                tft.setTextDatum(TL_DATUM);
+
+                tft.unloadFont();
+                xSemaphoreGive(OnlineUpdateSemaphoreHandle);
                 redraw = false;
             }
-            if (Online & (1 << 0)) tft.pushImage(8, 74, 32, 32, bitmap_pass); // Elmo1
-            else tft.pushImage(8, 74, 32, 32, bitmap_fail);
-            if (Online & (1 << 1)) tft.pushImage(44, 74, 32, 32, bitmap_pass); // Elmo2
-            else tft.pushImage(44, 74, 32, 32, bitmap_fail);
-            if (Online & (1 << 2)) tft.pushImage(80, 74, 32, 32, bitmap_pass); // Elmo3
-            else tft.pushImage(80, 74, 32, 32, bitmap_fail);
-            if (Online & (1 << 3)) tft.pushImage(116, 74, 32, 32, bitmap_pass); // Elmo4
-            else tft.pushImage(116, 74, 32, 32, bitmap_fail);
-            if (Online & (1 << 4)) tft.pushImage(152, 74, 32, 32, bitmap_pass); // Elmo5
-            else tft.pushImage(152, 74, 32, 32, bitmap_fail);
-            if (Online & (1 << 5)) tft.pushImage(196, 74, 32, 32, bitmap_pass); // Gyro&Encoder
-            else tft.pushImage(196, 74, 32, 32, bitmap_fail);
-            if (Online & (1 << 6)) tft.pushImage(240, 74, 32, 32, bitmap_pass); // GY53A
-            else tft.pushImage(240, 74, 32, 32, bitmap_fail);
-            if (Online & (1 << 7)) tft.pushImage(276, 74, 32, 32, bitmap_pass); // GY53B
-            else tft.pushImage(276, 74, 32, 32, bitmap_fail);
+            if (xSemaphoreTake(HeartbeatAnimeUpdateSemaphoreHandle, 0) == pdTRUE) heartbeatSprite.pushSprite(225, 0);
+            if (xSemaphoreTake(RSSIUpdateSemaphoreHandle, 0) == pdTRUE)
+            {
+                tft.setTextColor(Rainbow(WiFi.RSSI() ? WiFi.RSSI() + 100 : 0), TFT_BLACK);
+                tft.setTextDatum(TR_DATUM);
+                tft.setTextPadding(tft.textWidth("000"));
+                tft.setTextSize(2);
+                tft.drawString(WiFi.RSSI() ? String(WiFi.RSSI()) : "", 319, 0);
+                tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                tft.setTextDatum(TL_DATUM);
+                tft.setTextPadding(0);
+                tft.setTextSize(1);
+            }
+            if (xSemaphoreTake(OnlineUpdateSemaphoreHandle, 0) == pdTRUE)
+            {
+                if (Online & (1 << 0)) tft.pushImage(8, 74, 32, 32, bitmap_pass); // Elmo1
+                else tft.pushImage(8, 74, 32, 32, bitmap_fail);
+                if (Online & (1 << 1)) tft.pushImage(44, 74, 32, 32, bitmap_pass); // Elmo2
+                else tft.pushImage(44, 74, 32, 32, bitmap_fail);
+                if (Online & (1 << 2)) tft.pushImage(80, 74, 32, 32, bitmap_pass); // Elmo3
+                else tft.pushImage(80, 74, 32, 32, bitmap_fail);
+                /*
+                if (Online & (1 << 3)) tft.pushImage(116, 74, 32, 32, bitmap_pass); // Elmo4
+                else tft.pushImage(116, 74, 32, 32, bitmap_fail);
+                if (Online & (1 << 4)) tft.pushImage(152, 74, 32, 32, bitmap_pass); // Elmo5
+                else tft.pushImage(152, 74, 32, 32, bitmap_fail);
+                */
+                tft.pushImage(116, 74, 32, 32, bitmap_pass);
+                tft.pushImage(152, 74, 32, 32, bitmap_pass);
+                if (Online & (1 << 3)) tft.pushImage(196, 74, 32, 32, bitmap_pass); // Gyro&Encoder
+                else tft.pushImage(196, 74, 32, 32, bitmap_fail);
+                if (Online & (1 << 4)) tft.pushImage(240, 74, 32, 32, bitmap_pass); // DT35 X
+                else tft.pushImage(240, 74, 32, 32, bitmap_fail);
+                if (Online & (1 << 5)) tft.pushImage(276, 74, 32, 32, bitmap_pass); // DT35 Y
+                else tft.pushImage(276, 74, 32, 32, bitmap_fail);
+            }
             break;
 
             case 3: // @Variable
@@ -658,10 +761,9 @@ void TFTTask(void * pvParameters)
                     tft.drawString("Gyro:", 144, 60);
                     tft.drawString("Encoder[X]:", 144, 84);
                     tft.drawString("Encoder[Y]:", 144, 108);
-                    tft.drawString("GY53[A]:", 144, 132);
-                    tft.drawString("GY53[B]:", 144, 156);
-                    tft.drawString("DT35:", 144, 180);
-                    tft.drawString("User:", 144, 204);
+                    tft.drawString("DT35[X]:", 144, 132);
+                    tft.drawString("DT35[Y]:", 144, 156);
+                    tft.drawString("Custom:", 144, 180);
                     tft.setTextFont(2);
                     tft.setTextDatum(TL_DATUM);
                     break;
@@ -680,20 +782,13 @@ void TFTTask(void * pvParameters)
                     tft.setTextFont(2);
                     tft.setTextDatum(TL_DATUM);
                     break;
-
-                    case 2: // @Variable.TouchScreen
-                    tft.setTextDatum(CC_DATUM);
-                    tft.drawString("TouchScreen", 160, 42);
-                    tft.setTextDatum(TL_DATUM);
-                    tft.drawRect(20, 70, 280, 160, TFT_WHITE);
-                    break;
                 }
                 redraw = false;
             }
             tft.setTextDatum(TC_DATUM);
             tft.setTextPadding(192);
-            tft.drawString("FSM Code: 12", 160 , 0);
-            tft.drawString("Waiting for launch command", 160 , 16);
+            tft.drawString("FSM Code: 0", 160 , 0);
+            tft.drawString("Waiting for commands", 160 , 16);
             tft.setTextDatum(TL_DATUM);
             tft.setTextPadding(0);
             if (isRecording) tft.pushImage(288, 0, 32, 32, bitmap_record_stop, TFT_BLACK);
@@ -707,10 +802,9 @@ void TFTTask(void * pvParameters)
                 tft.drawString(String(Gyroscope, 3), 160, 60);
                 tft.drawString(String(Encoder[0], 3), 160, 84);
                 tft.drawString(String(Encoder[1], 3), 160, 108);
-                tft.drawString(String(GY53[0], 3), 160, 132);
-                tft.drawString(String(GY53[1], 3), 160, 156);
-                tft.drawString(String(DT35, 3), 160, 180);
-                tft.drawString(String(User, 4), 160, 204);
+                tft.drawString(String(DT35[0], 3), 160, 132);
+                tft.drawString(String(DT35[1], 3), 160, 156);
+                tft.drawString(String(Custom, 3), 160, 180);
                 tft.setTextFont(2);
                 tft.setTextDatum(TL_DATUM);
                 tft.setTextPadding(0);
@@ -731,21 +825,6 @@ void TFTTask(void * pvParameters)
                 tft.setTextFont(2);
                 tft.setTextDatum(TL_DATUM);
                 tft.setTextPadding(0);
-                break;
-
-                case 2:
-                tft.setTextDatum(CC_DATUM);
-                tft.setTextPadding(108);
-                tft.drawString('(' + String(TouchScreen[0]) + ", " + String(TouchScreen[1]) + ')', 160, 60);
-                tft.setTextDatum(TL_DATUM);
-                tft.setTextPadding(0);
-                if (TouchScreen[0] && TouchScreen[1])
-                {
-                    tft.fillRect(20, 70, 280, 160, TFT_BLACK);
-                    tft.drawRect(20, 70, 280, 160, TFT_WHITE);
-                    tft.drawCircle(20 + 0.8 * TouchScreen[0], 70 + 0.8 * TouchScreen[1], 20, TFT_WHITE);
-                    tft.fillCircle(20 + 0.8 * TouchScreen[0], 70 + 0.8 * TouchScreen[1], 2, TFT_WHITE);
-                }
                 break;
             }
             break;
@@ -775,7 +854,12 @@ void TFTTask(void * pvParameters)
                 if (config.rawUART) tft.pushImage(160, 100, 54, 32, bitmap_switch_on, TFT_BLACK);
                 else tft.pushImage(160, 100, 54, 32, bitmap_switch_off, TFT_BLACK);
 
+                tft.setTextColor(TFT_DARKGREEN, TFT_BLACK);
                 tft.setTextFont(2);
+                tft.setTextDatum(CC_DATUM);
+                tft.drawString("UESTC Robot Probe For ABU Robocon 2018", 160, 200);
+                tft.drawString("Copyright (c) 2018 HsuRY <i@hsury.com>", 160, 216);
+                tft.setTextColor(TFT_WHITE, TFT_BLACK);
                 tft.setTextDatum(TL_DATUM);
                 redraw = false;
             }
@@ -880,7 +964,7 @@ void TFTTask(void * pvParameters)
             }
             break;
         }
-        if (scene != 6) delay(50); // Disable screen refresh interval when CAN bus monitor is turned on
+        if (scene != 6) delay(25); // Disable screen refresh interval when CAN bus monitor is turned on
         // Touchscreen control code is below
         if (pressed) delay(100); // Touchscreen pressed seperator
         pressed = tft.getTouch(&xTouch, &yTouch); 
@@ -893,13 +977,13 @@ void TFTTask(void * pvParameters)
                 case 1: // @Main
                 if (xTouch >= 13 && xTouch <= 152 && yTouch >= 57 && yTouch <= 106) // => Selftest
                 {
-                    Online = 0;
-                    CAN_tx_frame.MsgID = Keyboard_ID;
-                    CAN_tx_frame.FIR.B.DLC = 1;
-                    CAN_tx_frame.data.u8[0] = 0x01;
-                    ESP32Can.CANWriteFrame(&CAN_tx_frame);
                     scene = 2;
                     redraw = true;
+                    Online = 0;
+                    CAN_tx_frame.MsgID = Online_ID;
+                    CAN_tx_frame.FIR.B.DLC = 1;
+                    CAN_tx_frame.data.u8[0] = 0x00;
+                    ESP32Can.CANWriteFrame(&CAN_tx_frame);
                 }
                 else if (xTouch >= 167 && xTouch <= 306 && yTouch >= 57 && yTouch <= 106) // => Variable
                 {
@@ -954,6 +1038,8 @@ void TFTTask(void * pvParameters)
                     CAN_tx_frame.FIR.B.DLC = 1;
                     CAN_tx_frame.data.u8[0] = 0x08;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                    audioController.stop();
+                    audioController.playFileIndex(2);
                 }
                 else if (xTouch >= 85 && xTouch <= 158 && yTouch >= 120 && yTouch <= 170) // Button 2
                 {
@@ -961,6 +1047,8 @@ void TFTTask(void * pvParameters)
                     CAN_tx_frame.FIR.B.DLC = 1;
                     CAN_tx_frame.data.u8[0] = 0x06;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                    audioController.stop();
+                    audioController.playFileIndex(2);
                 }
                 else if (xTouch >= 162 && xTouch <= 235 && yTouch >= 120 && yTouch <= 170) // Button 3
                 {
@@ -968,6 +1056,8 @@ void TFTTask(void * pvParameters)
                     CAN_tx_frame.FIR.B.DLC = 1;
                     CAN_tx_frame.data.u8[0] = 0x04;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                    audioController.stop();
+                    audioController.playFileIndex(2);
                 }
                 else if (xTouch >= 239 && xTouch <= 312 && yTouch >= 120 && yTouch <= 170) // Button 4
                 {
@@ -975,6 +1065,8 @@ void TFTTask(void * pvParameters)
                     CAN_tx_frame.FIR.B.DLC = 1;
                     CAN_tx_frame.data.u8[0] = 0x02;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                    audioController.stop();
+                    audioController.playFileIndex(2);
                 }
                 else if (xTouch >= 8 && xTouch <= 81 && yTouch >= 174 && yTouch <= 224) // Button 5
                 {
@@ -982,6 +1074,8 @@ void TFTTask(void * pvParameters)
                     CAN_tx_frame.FIR.B.DLC = 1;
                     CAN_tx_frame.data.u8[0] = 0x01;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                    audioController.stop();
+                    audioController.playFileIndex(2);
                 }
                 else if (xTouch >= 85 && xTouch <= 158 && yTouch >= 174 && yTouch <= 224) // Button 6
                 {
@@ -989,6 +1083,8 @@ void TFTTask(void * pvParameters)
                     CAN_tx_frame.FIR.B.DLC = 1;
                     CAN_tx_frame.data.u8[0] = 0x07;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                    audioController.stop();
+                    audioController.playFileIndex(2);
                 }
                 else if (xTouch >= 162 && xTouch <= 235 && yTouch >= 174 && yTouch <= 224) // Button 7
                 {
@@ -996,6 +1092,8 @@ void TFTTask(void * pvParameters)
                     CAN_tx_frame.FIR.B.DLC = 1;
                     CAN_tx_frame.data.u8[0] = 0x05;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                    audioController.stop();
+                    audioController.playFileIndex(2);
                 }
                 else if (xTouch >= 239 && xTouch <= 312 && yTouch >= 174 && yTouch <= 224) // Button 8
                 {
@@ -1003,6 +1101,8 @@ void TFTTask(void * pvParameters)
                     CAN_tx_frame.FIR.B.DLC = 1;
                     CAN_tx_frame.data.u8[0] = 0x03;
                     ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                    audioController.stop();
+                    audioController.playFileIndex(2);
                 }
                 break;
 
@@ -1011,12 +1111,12 @@ void TFTTask(void * pvParameters)
                 else if (xTouch >= 32 && xTouch <= 64 && yTouch >= 0 && yTouch <= 32) // Previous page
                 {
                     if (subScene > 0) subScene--;
-                    else subScene = 2;
+                    else subScene = 1;
                     redraw = true;
                 }
                 else if (xTouch >= 256 && xTouch <= 288 && yTouch >= 0 && yTouch <= 32) // Next page
                 {
-                    if (subScene < 2) subScene++;
+                    if (subScene < 1) subScene++;
                     else subScene = 0;
                     redraw = true;
                 }
@@ -1190,25 +1290,45 @@ void CANRecvTask(void * pvParameters)
                 Encoder[1] = STmp * PI * 50.7 / 2000 / 1000;
                 break;
 
-                case GY53_A_ID:
+                case DT35_X_ID:
                 DeviceNotify[2] = millis();
-                memcpy(&GY53[0], &CAN_rx_frame.data.u8[0], 4);
-                break;
-
-                case GY53_B_ID:
-                DeviceNotify[3] = millis();
-                memcpy(&GY53[1], &CAN_rx_frame.data.u8[0], 4);
-                break;
-
-                case DT35_ID:
-                DeviceNotify[4] = millis();
                 memcpy(&STmp, &CAN_rx_frame.data.u8[0], 4);
-                DT35 = STmp / 1000.0;
+                DT35[0] = STmp / 1000.0f + 0.46; // / 1000.0f + 0.46
                 break;
 
-                case TouchScreen_ID:
-                memcpy(&TouchScreen[0], &CAN_rx_frame.data.u8[0], 2);
-                memcpy(&TouchScreen[1], &CAN_rx_frame.data.u8[2], 2);
+                case DT35_Y_ID:
+                DeviceNotify[3] = millis();
+                memcpy(&STmp, &CAN_rx_frame.data.u8[0], 4);
+                DT35[1] = STmp / 1000.0f + 0.49; // / 1000.0f + 0.49
+                break;
+
+                case MR_ID:
+                if (CAN_rx_frame.data.u8[0] == 0xFF) // Packet asking AR to retry giving from MR
+                {
+                    switch (CAN_rx_frame.data.u8[1])
+                    {
+                        case 0x11:
+                        udp.beginPacket(UDP_ADDRESS, UDP_PORT);
+                        udp.write(0x11);
+                        udp.endPacket();
+                        Log("TZ1 1st retry command sent to AR");
+                        break;
+
+                        case 0x12:
+                        udp.beginPacket(UDP_ADDRESS, UDP_PORT);
+                        udp.write(0x12);
+                        udp.endPacket();
+                        Log("TZ1 2nd retry command sent to AR");
+                        break;
+
+                        case 0x21:
+                        udp.beginPacket(UDP_ADDRESS, UDP_PORT);
+                        udp.write(0x21);
+                        udp.endPacket();
+                        Log("TZ2 1st retry command sent to AR");
+                        break;
+                    }
+                }
                 break;
 
                 case Cradle_ID:
@@ -1217,21 +1337,42 @@ void CANRecvTask(void * pvParameters)
                     if (CAN_rx_frame.data.u8[1] == 0x01) // In TZ1
                     {
                         Log("Robot arrived in TZ1\r\n");
+                        //AddToPlaylist(2);
+                        //AddToPlaylist(16);
+                        for (uint8_t i = 0; i < 5; i++)
+                        {
+                            udp.beginPacket(UDP_ADDRESS, UDP_PORT);
+                            udp.write(0xA0);
+                            udp.endPacket();
+                        }
+                        Log("Cradle is ready\r\n");
                         AddToPlaylist(2);
-                        AddToPlaylist(16);
+                        AddToPlaylist(20);
                     }
                     else if (CAN_rx_frame.data.u8[1] == 0x02) // In TZ2
                     {
                         Log("Robot arrived in TZ2\r\n");
-                        AddToPlaylist(2);
-                        AddToPlaylist(17);
+                        //AddToPlaylist(2);
+                        //AddToPlaylist(17);
                     }
                     else if (CAN_rx_frame.data.u8[1] == 0x03) // In TZ3
                     {
                         Log("Robot arrived in TZ3\r\n");
-                        AddToPlaylist(2);
-                        AddToPlaylist(18);
+                        //AddToPlaylist(2);
+                        //AddToPlaylist(18);
                     }
+                }
+                else if (CAN_rx_frame.data.u8[0] == 0xEE && CAN_rx_frame.data.u8[1] == 0x01) // Cradle reports that it is ready to receive another shuttlecock
+                {
+                    for (uint8_t i = 0; i < 5; i++)
+                    {
+                        udp.beginPacket(UDP_ADDRESS, UDP_PORT);
+                        udp.write(0xA0);
+                        udp.endPacket();
+                    }
+                    Log("Cradle is ready\r\n");
+                    AddToPlaylist(2);
+                    AddToPlaylist(20);
                 }
                 break;
 
@@ -1246,10 +1387,11 @@ void CANRecvTask(void * pvParameters)
 
                 case Online_ID:
                 memcpy(&Online, &CAN_rx_frame.data.u8[0], 4);
+                xSemaphoreGive(OnlineUpdateSemaphoreHandle);
                 break;
 
-                case User_ID:
-                memcpy(&User, &CAN_rx_frame.data.u8[0], sizeof(User));
+                case Custom_ID:
+                memcpy(&Custom, &CAN_rx_frame.data.u8[0], sizeof(Custom));
                 break;
 
                 case Timer_ID:
@@ -1257,7 +1399,7 @@ void CANRecvTask(void * pvParameters)
                 break;
             }
         }
-        if (TFTTaskHandle) xTaskNotifyGive(TFTTaskHandle); //xTaskNotify(TFTTaskHandle, 1, eSetValueWithOverwrite); 
+        if (TFTTaskHandle) xTaskNotifyGive(TFTTaskHandle); // xTaskNotify(TFTTaskHandle, 1, eSetValueWithOverwrite); 
         if (CANLogFile) // Save log file to SD Card
         {
             CANLogFile.printf("%02u:%02u:%02u,%u,%u,0x%X,%d,", hour(), minute(), second(), millis(), packNum, CAN_rx_frame.MsgID, CAN_rx_frame.FIR.B.DLC);
@@ -1352,21 +1494,92 @@ void RobotSelftestTask(void * pvParameters)
     vTaskDelete(NULL);
 }
 
+void HeartbeatAnimeTask(void * pvParameters)
+{
+    uint8_t ShadeWidth = 8;
+    while (1)
+    {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        int8_t ShadePos = -ShadeWidth;
+        while (ShadePos <= 35)
+        {
+            heartbeatSprite.fillSprite(TFT_BLACK);
+            heartbeatSprite.pushImage(0, 0, 35, 24, bitmap_heartbeat);
+            heartbeatSprite.fillRect(0, 0, ShadePos, 24, TFT_BLACK);
+            heartbeatSprite.fillRect(ShadePos + ShadeWidth, 0, 35 - ShadePos - ShadeWidth, 24, TFT_BLACK);
+            ShadePos += 1;
+            xSemaphoreGive(HeartbeatAnimeUpdateSemaphoreHandle);
+            delay(25);
+        }
+        ulTaskNotifyTake(pdTRUE, 0);
+    }
+    vTaskDelete(NULL);
+}
+
+void PingTimerCallback(TimerHandle_t xTimer)
+{
+    udp.beginPacket(UDP_ADDRESS, UDP_PORT);
+    udp.write(0xFF);
+    udp.endPacket();
+}
+
+void RSSITimerCallback(TimerHandle_t xTimer)
+{
+    xSemaphoreGive(RSSIUpdateSemaphoreHandle);
+}
+
 void processCmdRemoteDebug()
 {
     String lastCmd = Debug.getLastCommand();
-    if (lastCmd == "play")
+    if (Debug.isActive(Debug.ANY))
     {
-        if (Debug.isActive(Debug.ANY))
+        if (lastCmd == "demo")
         {
-            Log("OK, let's make it!");
-            DEBUG_V("* This is a message of debug level VERBOSE\n");
-            DEBUG_D("* This is a message of debug level DEBUG\n");
-            DEBUG_I("* This is a message of debug level INFO\n");
-            DEBUG_W("* This is a message of debug level WARNING\n");
-            DEBUG_E("* This is a message of debug level ERROR\n");
+            DEBUG_V("VERBOSE\n");
+            DEBUG_D("DEBUG\n");
+            DEBUG_I("INFO\n");
+            DEBUG_W("WARNING\n");
+            DEBUG_E("ERROR\n");
+        }
+        else if (lastCmd == "count")
+        {
+            AddToPlaylist(12);
+            AddToPlaylist(13);
+            AddToPlaylist(14);
+            AddToPlaylist(15);
+        }
+        else if (lastCmd == "r11")
+        {
+            CAN_tx_frame.MsgID = Cradle_ID;
+            CAN_tx_frame.FIR.B.DLC = 2;
+            CAN_tx_frame.data.u8[0] = 0xFF;
+            CAN_tx_frame.data.u8[1] = 0x11;
+            ESP32Can.CANWriteFrame(&CAN_tx_frame);
+            Log("TZ1 1st retry command sent to cradle");
             audioController.stop();
-            audioController.playFileIndex(1);
+            audioController.playFileIndex(2);
+        }
+        else if (lastCmd == "r12")
+        {
+            CAN_tx_frame.MsgID = Cradle_ID;
+            CAN_tx_frame.FIR.B.DLC = 2;
+            CAN_tx_frame.data.u8[0] = 0xFF;
+            CAN_tx_frame.data.u8[1] = 0x12;
+            ESP32Can.CANWriteFrame(&CAN_tx_frame);
+            Log("TZ1 2nd retry command sent to cradle");
+            audioController.stop();
+            audioController.playFileIndex(2);
+        }
+        else if (lastCmd == "r21")
+        {
+            CAN_tx_frame.MsgID = Cradle_ID;
+            CAN_tx_frame.FIR.B.DLC = 2;
+            CAN_tx_frame.data.u8[0] = 0xFF;
+            CAN_tx_frame.data.u8[1] = 0x21;
+            ESP32Can.CANWriteFrame(&CAN_tx_frame);
+            Log("TZ2 1st retry command sent to cradle");
+            audioController.stop();
+            audioController.playFileIndex(2);
         }
     }
 }
@@ -1455,4 +1668,47 @@ void Log(const char * format, ...) // Customized printf based logging function
         externalLogFile.printf(",\r\n");
     }
     va_end(vargs);
+}
+
+uint16_t Rainbow(uint8_t Value)
+{
+    // Value is expected to be in range 0-127
+    // The value is converted to a spectrum colour from 0 = red through to 127 = blue
+    
+    if (Value > 127) Value = 255 - Value; // Make the color swing
+
+    uint8_t Red   = 0; // Red is the top 5 bits of a 16 bit colour value
+    uint8_t Green = 0; // Green is the middle 6 bits
+    uint8_t Blue  = 0; // Blue is the bottom 5 bits
+
+    uint8_t Sector = Value >> 5;
+    uint8_t Amplit = Value & 0x1F;
+
+    switch (Sector)
+    {
+        case 0:
+        Red   = 0x1F;
+        Green = Amplit;
+        Blue  = 0;
+        break;
+
+        case 1:
+        Red   = 0x1F - Amplit;
+        Green = 0x1F;
+        Blue  = 0;
+        break;
+
+        case 2:
+        Red   = 0;
+        Green = 0x1F;
+        Blue  = Amplit;
+        break;
+
+        case 3:
+        Red   = 0;
+        Green = 0x1F - Amplit;
+        Blue  = 0x1F;
+        break;
+    }
+    return Red << 11 | Green << 6 | Blue;
 }

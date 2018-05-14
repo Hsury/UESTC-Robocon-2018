@@ -17,6 +17,8 @@ extern TaskHandle_t FireTask_Handler;
 extern TaskHandle_t WirelessTask_Handler;
 extern TaskHandle_t FlowTask_Handler;
 
+extern SemaphoreHandle_t JustThrowSemaphore;
+
 void FlashTask(void *pvParameters);
 void BeepTask(void *pvParameters);
 void ReportTask(void *pvParameters);

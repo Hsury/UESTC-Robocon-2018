@@ -11,13 +11,8 @@
 
 #define SUBWHEEL_DIAMETER      (50.7f)           // 码盘从动轮直径（毫米）
 
-#define DT35_H_STATIC_DIST     (0.0f)            // 头部DT35传感器距离车X轴距离
-#define DT35_F_STATIC_DIST     (0.0f)            // 左前侧DT35传感器距离车Y轴距离
-#define DT35_R_STATIC_DIST     (0.0f)            // 左后侧DT35传感器距离车Y轴距离
-#define DT35_F_R_GAP           (0.0f)            // 两颗DT35的间距
-
-#define PHOTO_SENSOR_X_DIST    (0.39f)           // X轴光电传感器至过机器中心Y轴的距离
-#define PHOTO_SENSOR_Y_DIST    (0.26f)           // Y轴光电传感器至过机器中心X轴的距离
+#define DT35_X_STATIC_DIST     (0.510f)          // 左侧DT35传感器距离车Y轴距离
+#define DT35_Y_STATIC_DIST     (0.460f)          // 后侧DT35传感器距离车X轴距离
 
 #define clamp(x, lower, upper) (x >= upper ? upper : (x <= lower ? lower : x))
 
@@ -42,11 +37,7 @@
 #define DeltaPos(dx, dy) (sqrt((dx) * (dx) + (dy) * (dy)))
 #define DeltaAng(dz) (dz < -180 ? dz + 360 : (dz >= 180 ? dz - 360 : dz))
 
-#define DT352RealX ((DT35F + DT35R) / 2.0f * cos(deg2rad(PosZ)))
-#define DT352RealY (DT35H * cos(deg2rad(PosZ)))
-#define DT352RealZ (rad2deg(atan2(DT35R - DT35F, DT35_F_R_GAP)))
-
-#define PhotoSensorXOffset (- PHOTO_SENSOR_X_DIST * (1 - cos(deg2rad(PosZ))))
-#define PhotoSensorYOffset (- PHOTO_SENSOR_Y_DIST * (1 - cos(deg2rad(PosZ))))
+#define DT352RealX (DT35X * cos(deg2rad(PosZ)))
+#define DT352RealY (DT35Y * cos(deg2rad(PosZ)))
 
 #endif

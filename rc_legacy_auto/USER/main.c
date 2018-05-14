@@ -13,7 +13,7 @@
                      ===== UESTC Legacy Auto Robot For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/04/02
+                                        VERSION 2018/04/16
 
 */
 
@@ -50,7 +50,7 @@ void InitTask(void *pvParameters)
     //ESP8266_StationConfig("HsuRY", "***REMOVED***");
     //ESP8266_StationDHCPConfig(true);
     //ESP8266_StationIPConfig("192.168.1.234", "192.168.1.1", "255.255.255.0");
-    //ESP8266_SoftAPConfig("HsuRY's STM32F407", "***REMOVED***", 5, WPA2_PSK, 2, false);
+    //ESP8266_SoftAPConfig("HsuRY's STM32F407", "***REMOVED***", 6, WPA2_PSK, 2, false);
     //ESP8266_TransLinkConfig("192.168.1.233", 2333, UDP, 2333);
     //ESP8266_Reset();
     

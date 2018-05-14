@@ -1,8 +1,9 @@
 #include "Sling.h"
 
-ArmParam_t ArmParam_TZ1 = {.StartPoint = ARM_LOADING_POS, .EndPoint = 2900, .Speed = 48000};
-ArmParam_t ArmParam_TZ2 = {.StartPoint = ARM_LOADING_POS, .EndPoint = 2900, .Speed = 53000};
-ArmParam_t ArmParam_TZ3 = {.StartPoint = ARM_LOADING_POS, .EndPoint = 2875, .Speed = 62500};
+//ArmParam_t ArmParam_TZ1 = {.StartPoint = ARM_LOADING_POS, .EndPoint = 3000, .Speed = 58000}; //2900 48000 //46000
+ArmParam_t ArmParam_TZ1 = {.StartPoint = ARM_LOADING_POS, .EndPoint = 2980, .Speed = 55000}; //2900 48000 //46000
+ArmParam_t ArmParam_TZ2 = {.StartPoint = ARM_LOADING_POS, .EndPoint = 3050, .Speed = 58500}; //2900 53000 //51000 //60000
+ArmParam_t ArmParam_TZ3 = {.StartPoint = ARM_LOADING_POS, .EndPoint = 2875, .Speed = 60500}; //62500 //59600
 
 int32_t SliderPos = 0;
 int32_t RotorPos = 0;
@@ -20,15 +21,17 @@ uint8_t ArmJob = IDLE;
 void Sling_Init()
 {
     PIDArm = PID(&ArmPos, &PIDOutArm, &GoalArm, 80, 0, 0, PID_P_ON_E, PID_REVERSE);
-    PID_SetOutputLimits(&PIDArm, -10000, 10000);
+    PID_SetOutputLimits(&PIDArm, -8000, 8000);
     PID_SetSampleTime(&PIDArm, 5);
     Elmo_Reinit(4);
     Elmo_Reinit(5);
     Elmo_Reinit(6);
-    delay_ms(50);
+    //delay_xms(50);
     Elmo_Set_POS(4, 0);
     Elmo_Set_POS(5, 0);
-    delay_ms(50);
+    //delay_xms(50);
+    Elmo_SetAcc(4, 50000000, 50000000);
+    //delay_xms(50);
 }
 
 void Sling_Release()
@@ -77,7 +80,8 @@ void Sling_ArmAdjust()
         Elmo_PVM(6, (int)PIDOutArm);
         delay_ms(5);
     }
-    while (fabs(PIDOutArm) > 32);
+    while ((int)PIDOutArm != 0);
+    Printf(ESP8266, "Arm=%d\r\n", (int)ArmPos);
     Elmo_Stop(6);
     PID_SetMode(&PIDArm, PID_MANUAL);
     GoalArm = ARM_LOADING_POS;
@@ -87,8 +91,8 @@ void Sling_ArmAdjust()
 void Sling_Fire(ArmParam_t *ArmParamStruct, bool Block)
 {
     while (ArmJob != IDLE) delay_ms(1); //等待悬臂空闲
-    GoalArm = ArmParamStruct->StartPoint;
-    Sling_ArmAdjust();
+    //GoalArm = ArmParamStruct->StartPoint;
+    //Sling_ArmAdjust();
     ArmJob = FIRE;
     ArmEndPoint = ArmParamStruct->EndPoint;
     Elmo_PVM(6, - ArmParamStruct->Speed);

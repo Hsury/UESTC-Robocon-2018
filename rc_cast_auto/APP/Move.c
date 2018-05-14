@@ -1,35 +1,59 @@
 #include "Move.h"
 
-//                                        X     Y     Z
+/*
 PathParam_t PathParam_SZ_TZ1 =    {.P0 = {0.55, 7.54, 0.00}, 
-                                   .P1 = {0.80, 4.00, 0.00}, 
-                                   .P2 = {0.80, 3.32, 0.00}, 
-                                   .P3 = {2.80, 3.37, 0.00}, 
+                                   .P1 = {0.80, 3.90, 0.00}, 
+                                   .P2 = {0.80, 3.02, 0.00}, 
+                                   .P3 = {2.85, 2.97, 0.00}, 
                                    .Kp = {2.25, 2.50, 5.00}, 
                                    .Ki = {0.00, 0.00, 0.00}, 
                                    .Kd = {0.00, 0.00, 0.00}, 
-                                   .Limit = {4.25, 4.25, 90}, 
-                                   .Duration = 2200};
+                                   .Limit = {4.75, 4.75, 90}, 
+                                   .Duration = 2700};
+                                   
+PathParam_t PathParam_SZ_TZ1 =    {.P0 = {0.55, 7.54, 0.00}, 
+                                   .P1 = {0.90, 4.12, 0.00}, 
+                                   .P2 = {1.25, 3.07, 0.00}, 
+                                   .P3 = {2.85, 2.97, 0.00}, 
+                                   .Kp = {2.75, 2.75, 5.00}, 
+                                   .Ki = {0.00, 0.00, 0.00}, 
+                                   .Kd = {0.00, 0.00, 0.00}, 
+                                   .Limit = {4.5, 4.5, 90}, 
+                                   .Duration = 2500};
+*/
 
-PathParam_t PathParam_TZ1_TZ2 =   {.P0 = {2.80, 3.37, 0.00}, 
-                                   .P1 = {1.10, 2.87, 1.00}, 
-                                   .P2 = {1.10, 1.47, 2.00}, 
-                                   .P3 = {2.80, 1.37, 3.00}, 
+/*
+2018/04/20
+//                                        X     Y     Z
+PathParam_t PathParam_SZ_TZ1 =    {.P0 = {0.55, 7.54, 0.00}, 
+                                   .P1 = {0.80, 3.90, 0.00}, 
+                                   .P2 = {0.80, 3.02, 0.00}, 
+                                   .P3 = {2.85, 2.97, 0.00}, 
+                                   .Kp = {2.25, 2.50, 5.00}, 
+                                   .Ki = {0.00, 0.00, 0.00}, 
+                                   .Kd = {0.00, 0.00, 0.00}, 
+                                   .Limit = {4.75, 4.75, 90}, 
+                                   .Duration = 10000}; //2700
+
+PathParam_t PathParam_TZ1_TZ2 =   {.P0 = {2.85, 2.97, 0.00}, 
+                                   .P1 = {0.80, 2.57, 0.00}, 
+                                   .P2 = {0.80, 0.47, 0.00}, 
+                                   .P3 = {3.75, 0.97, 0.00}, 
+                                   .Kp = {2.85, 2.65, 5.00}, 
+                                   .Ki = {0.00, 0.00, 0.00}, 
+                                   .Kd = {0.00, 0.00, 0.00}, 
+                                   .Limit = {4.75, 4.75, 90}, 
+                                   .Duration = 10000}; //2400
+
+PathParam_t PathParam_TZ2_TZ3 =   {.P0 = {3.75, 0.97, 0.00}, 
+                                   .P1 = {7.00, 0.97, 0.00}, 
+                                   .P2 = {7.00, 0.97, 0.00}, 
+                                   .P3 = {7.00, 0.97, 0.00}, 
                                    .Kp = {2.50, 2.50, 5.00}, 
                                    .Ki = {0.00, 0.00, 0.00}, 
                                    .Kd = {0.00, 0.00, 0.00}, 
-                                   .Limit = {4.25, 4.25, 90}, 
-                                   .Duration = 1750};
-
-PathParam_t PathParam_TZ2_TZ3 =   {.P0 = {2.80, 1.37, 3.00}, 
-                                   .P1 = {4.80, 1.37, 5.00}, 
-                                   .P2 = {6.99, 1.37, 9.00}, 
-                                   .P3 = {7.00, 1.37, 13.00}, 
-                                   .Kp = {2.25, 2.50, 5.00}, 
-                                   .Ki = {0.00, 0.00, 0.00}, 
-                                   .Kd = {0.00, 0.00, 0.00}, 
-                                   .Limit = {4.25, 4.25, 90}, 
-                                   .Duration = 2000};
+                                   .Limit = {4.75, 4.75, 90}, 
+                                   .Duration = 6000}; //2000
 
 PathParam_t PathParam_SZ_TZ2 =    {.P0 = {0.55, 7.54, 0.00}, 
                                    .P1 = {1.25, 2.00, 1.00}, 
@@ -40,10 +64,93 @@ PathParam_t PathParam_SZ_TZ2 =    {.P0 = {0.55, 7.54, 0.00},
                                    .Kd = {0.00, 0.00, 0.00}, 
                                    .Limit = {4.25, 4.25, 90}, 
                                    .Duration = 3000};
+*/
 
-PathParam_t PathParam_LockPoint = {.Kp = {4.00, 4.00, 5.00}, 
+//                                        X     Y     Z
+PathParam_t PathParam_LockPoint = {.Kp = {3.00, 3.00, 7.00}, 
                                    .Ki = {0.00, 0.00, 0.00}, 
-                                   .Kd = {0.00, 0.00, 0.00}};
+                                   .Kd = {0.00, 0.00, 0.00}, 
+                                   .Limit = {2.00, 2.00, 60}};
+
+PathParam_t PathParam_SZ_TZ1 =    {.P0 = {0.55, 7.54, 0.00}, 
+                                   .P1 = {0.80, 3.90, 0.00}, 
+                                   .P2 = {0.80, 3.02, 0.00}, 
+                                   .P3 = {3.78, 2.97, 0.00}, 
+                                   .Kp = {2.25, 2.50, 5.00}, 
+                                   .Ki = {0.00, 0.00, 0.00}, 
+                                   .Kd = {0.00, 0.00, 0.00}, 
+                                   .Limit = {4.75, 4.75, 90}, 
+                                   .Duration = 4500}; //2700 //2900
+
+PathParam_t PathParam_TZ1_TZ2 =   {.P0 = {3.78, 2.97, 0.00}, 
+                                   .P1 = {0.30, 3.07, 0.00}, 
+                                   .P2 = {0.30, 0.72, 0.00}, 
+                                   .P3 = {3.78, 0.97, 0.00}, 
+                                   .Kp = {2.80, 2.65, 5.00}, 
+                                   .Ki = {0.00, 0.00, 0.00}, 
+                                   .Kd = {0.00, 0.00, 0.00}, 
+                                   .Limit = {4.75, 4.75, 90}, 
+                                   .Duration = 4500}; //2400 //2950 //3400
+
+PathParam_t PathParam_TZ2_TZ3 =   {.P0 = {3.78, 0.97, 0.00}, 
+                                   .P1 = {3.78, 0.97, 0.00}, 
+                                   .P2 = {7.08, 0.97, 0.00}, 
+                                   .P3 = {7.08, 0.97, 0.00}, 
+                                   .Kp = {2.25, 2.50, 5.00}, 
+                                   .Ki = {0.00, 0.00, 0.00}, 
+                                   .Kd = {0.00, 0.00, 0.00}, 
+                                   .Limit = {4.75, 4.75, 90}, 
+                                   .Duration = 2500}; //2000 //1750
+
+PathParam_t PathParam_SZ_TZ2 =    {.P0 = {0.55, 7.54, 0.00}, 
+                                   .P1 = {0.60, 1.90, 0.00}, 
+                                   .P2 = {0.60, 1.02, 0.00}, 
+                                   .P3 = {3.78, 0.97, 0.00}, 
+                                   .Kp = {2.25, 2.50, 5.00}, 
+                                   .Ki = {0.00, 0.00, 0.00}, 
+                                   .Kd = {0.00, 0.00, 0.00}, 
+                                   .Limit = {4.75, 4.75, 90}, 
+                                   .Duration = 10000}; //4500 //5000
+
+PathParam_t PathParam_SZ_TZ3 =    {.P0 = {0.55, 7.54, 0.00}, 
+                                   .P1 = {0.55, 0.97, 0.00}, 
+                                   .P2 = {0.55, 0.97, 0.00}, 
+                                   .P3 = {7.08, 0.97, 0.00}, 
+                                   .Kp = {2.25, 2.50, 5.00}, 
+                                   .Ki = {0.00, 0.00, 0.00}, 
+                                   .Kd = {0.00, 0.00, 0.00}, 
+                                   .Limit = {4.75, 4.75, 90}, 
+                                   .Duration = 15000}; //4500 //5000
+
+PathParam_t PathParam_TZ1_SZ =    {.P0 = {3.78, 2.97, 0.00}, 
+                                   .P1 = {0.80, 3.02, 0.00}, 
+                                   .P2 = {0.80, 3.90, 0.00}, 
+                                   .P3 = {0.85, 7.54, 0.00}, 
+                                   .Kp = {2.00, 2.00, 5.00}, 
+                                   .Ki = {0.00, 0.00, 0.00}, 
+                                   .Kd = {0.00, 0.00, 0.00}, 
+                                   .Limit = {2.00, 2.00, 45}, 
+                                   .Duration = 5000};
+
+PathParam_t PathParam_TZ2_SZ =    {.P0 = {3.78, 0.97, 0.00}, 
+                                   .P1 = {0.60, 1.02, 0.00}, 
+                                   .P2 = {0.60, 1.90, 0.00}, 
+                                   .P3 = {0.85, 7.54, 0.00}, 
+                                   .Kp = {2.00, 2.00, 5.00}, 
+                                   .Ki = {0.00, 0.00, 0.00}, 
+                                   .Kd = {0.00, 0.00, 0.00}, 
+                                   .Limit = {2.00, 2.00, 45}, 
+                                   .Duration = 5000};
+
+PathParam_t PathParam_TZ3_SZ =    {.P0 = {7.08, 0.97, 0.00}, 
+                                   .P1 = {0.55, 0.67, 0.00}, 
+                                   .P2 = {0.55, 0.67, 0.00}, 
+                                   .P3 = {0.85, 7.54, 0.00}, 
+                                   .Kp = {2.00, 2.00, 5.00}, 
+                                   .Ki = {0.00, 0.00, 0.00}, 
+                                   .Kd = {0.00, 0.00, 0.00}, 
+                                   .Limit = {2.00, 2.00, 45}, 
+                                   .Duration = 12000};
 
 PID_t PIDX;
 PID_t PIDY;
@@ -64,9 +171,7 @@ void Move_Init()
     PID_SetSampleTime(&PIDX, 5);
     PID_SetSampleTime(&PIDY, 5);
     PID_SetSampleTime(&PIDZ, 5);
-    Elmo_Reinit(1);
-    Elmo_Reinit(2);
-    Elmo_Reinit(3);
+    Elmo_Reinit(0);
     delay_ms(50);
 }
 
@@ -98,57 +203,29 @@ bool Move_UpdateZone()
     }
     else
     {
-        if (Zone != CORRIDOR)
+        if (Zone != MRA)
         {
-            Zone = CORRIDOR;
+            Zone = MRA;
             return true;
         }
     }
     return false;
 }
 
-/*
 bool Move_Relocate()
 {
-    Move_UpdateZone();
-    if ((Zone == TZ1 || Zone == TZ2 || Zone == TZ3) &&  //只在TZ1，TZ2，TZ3内进行重定位
-        (fabs(PosZ) < 15) &&                            //偏角在15度以内
-        (fabs(VelX) < 0.20) &&                          //X轴速度小于20cm/s
-        (fabs(VelY) < 0.05) &&                          //Y轴速度小于5cm/s
-        (fabs(VelZ) < 5) &&                             //Z轴速度小于5度/s
-        (fabs(PosZ - GY532RealZ) < 15))                 //GY53算出的角度和陀螺仪反馈的角度差值小于15度
+    if (fabs(PosX - DT35X) < 0.20 && fabs(PosY - DT35Y) < 0.20)
     {
-        if (Zone == TZ1 && fabs(DT502RealX - PosX) <= 0.2 && fabs(3.37 + 0.60 - GY532RealY - PosY) <= 0.2)
-        {
-            GyroEncoder_Off();
-            PosX = DT502RealX;
-            PosY = 3.37 + 0.60 - GY532RealY;
-            GyroEncoder_SetPos();
-            GyroEncoder_On();
-            return true;
-        }
-        else if (Zone == TZ2 && fabs(DT502RealX - PosX) <= 0.2 && fabs(1.37 + 0.60 - GY532RealY - PosY) <= 0.2)
-        {
-            GyroEncoder_Off();
-            PosX = DT502RealX;
-            PosY = 1.37 + 0.60 - GY532RealY;
-            GyroEncoder_SetPos();
-            GyroEncoder_On();
-            return true;
-        }
-        else if (Zone == TZ3 && fabs(DT502RealX - PosX) <= 0.2 && fabs(1.37 + 0.60 - GY532RealY - PosY) <= 0.2)
-        {
-            GyroEncoder_Off();
-            PosX = DT502RealX;
-            PosY = 1.37 + 0.60 - GY532RealY;
-            GyroEncoder_SetPos();
-            GyroEncoder_On();
-            return true;
-        }
+        GyroEncoder_Off();
+        delay_ms(10);
+        PosX = DT35X;
+        PosY = DT35Y;
+        GyroEncoder_SetPos();
+        GyroEncoder_On();
+        return true;
     }
     return false;
 }
-*/
 
 void Move_SetGoal(PathParam_t* PathParamStruct, uint32_t TimePassed)
 {
@@ -270,34 +347,3 @@ float CubicBezierDt(float P0, float P1, float P2, float P3, uint32_t T, uint32_t
             6 * (1 - Fraction) * Fraction * (P2 - P1) + 
             3 * pow(Fraction, 2) * (P3 - P2)) / (Duration / 1000.0f);
 }
-
-/*
-uint32_t UniformPlusP(float GoalX, float GoalY, float GoalZ, uint32_t BlockTime)
-{
-    uint32_t StartTS = millis();
-    float DistX, DistY, DistZ, DistRes;
-    do
-    {
-        DistX = GoalX - PosX;
-        DistY = GoalY - PosY;
-        DistZ = DeltaAng(GoalZ - PosZ);
-        DistRes = sqrt(DistX * DistX + DistY * DistY);
-        if (DistRes > SAFE_DIST)
-        {
-            VelX = DistX * MAX_SPEED / DistRes;
-            VelY = DistY * MAX_SPEED / DistRes;
-        }
-        else
-        {
-            VelX = DistX * COEF_LINEAR;
-            VelY = DistY * COEF_LINEAR;
-        }
-        VelZ = DistZ * COEF_ANGULAR;
-        Omni_Elmo_PVM();
-        delay_ms(5);
-    }
-    while (abs(DistX) > 0.01 || abs(DistY) > 0.01 || abs(DistZ) > 1 || millis() - StartTS < BlockTime);
-    Omni_Elmo_Stop();
-    return millis() - StartTS;
-}
-*/

@@ -106,27 +106,27 @@ void EXTI15_10_IRQHandler()
         {
             //Sensor 1
             //Y轴色标传感器
-            if (PosX >= 1.50f && PosX <= 4.50f && PosY >= 3.25f && PosY <= 3.55f)
+            if (PosX >= 1.50f && PosX <= 4.50f && PosY >= 3.17f && PosY <= 3.47f)
             {
                 printf("TZ1 Y-Axis relocated at %.3f, VelY = %.3f\r\n", PosY, RealVelY);
                 GyroEncoder_Off();
-                PosY = 3.40 + PhotoSensorYOffset + (RealVelY < 0 ? 0 : -0.02);
+                PosY = 3.32 + PhotoSensorYOffset + (RealVelY < 0 ? 0 : -0.02);
                 GyroEncoder_SetPos();
                 GyroEncoder_On();
             }
-            else if (PosX >= 1.50f && PosX <= 4.50f && PosY >= 1.25f && PosY <= 1.55f)
+            else if (PosX >= 1.50f && PosX <= 4.50f && PosY >= 1.17f && PosY <= 1.47f)
             {
                 printf("TZ2 Y-Axis relocated at %.3f, VelY = %.3f\r\n", PosY, RealVelY);
                 GyroEncoder_Off();
-                PosY = 1.40 + PhotoSensorYOffset + (RealVelY < 0 ? 0 : -0.02);
+                PosY = 1.32 + PhotoSensorYOffset + (RealVelY < 0 ? 0 : -0.02);
                 GyroEncoder_SetPos();
                 GyroEncoder_On();
             }
-            else if (PosX >= 5.00f && PosX <= 8.00f && PosY >= 1.25f && PosY <= 1.55f)
+            else if (PosX >= 5.00f && PosX <= 8.00f && PosY >= 1.17f && PosY <= 1.47f)
             {
                 printf("TZ3 Y-Axis relocated at %.3f, VelY = %.3f\r\n", PosY, RealVelY);
                 GyroEncoder_Off();
-                PosY = 1.40 + PhotoSensorYOffset + (RealVelY < 0 ? 0 : -0.02);
+                PosY = 1.32 + PhotoSensorYOffset + (RealVelY < 0 ? 0 : -0.02);
                 GyroEncoder_SetPos();
                 GyroEncoder_On();
             }

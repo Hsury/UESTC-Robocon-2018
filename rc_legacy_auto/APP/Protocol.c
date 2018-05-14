@@ -2,6 +2,7 @@
 
 uint8_t Checkout(RingBuf_t* Q)
 {
+    BaseType_t pxHigherPriorityTaskWoken;
     uint8_t HeadByte, SeperatorByte, TailByte;
     RingBuf_Peek(Q, 0, &HeadByte);
     RingBuf_Peek(Q, 2, &SeperatorByte);
@@ -28,21 +29,23 @@ uint8_t Checkout(RingBuf_t* Q)
                 PackUp(0x00, (uint8_t*)(&Online));
                 break;
                 
-                case 0x00000001: // 初始化所有外设
-                Online = 0x0000;
-                Elmo_Init(CAN1, 9, 0);
-                GyroEncoder_Reset();
+                case 0x00000001: // 初始化底盘
+                Move_Init();
                 break;
                 
-                case 0x00000002:; // 开始执行底盘运动任务
-                BaseType_t pxHigherPriorityTaskWoken;
-                vTaskNotifyGiveFromISR(MoveTask_Handler, &pxHigherPriorityTaskWoken);
-                if (pxHigherPriorityTaskWoken != pdFALSE) taskYIELD();
+                case 0x00000002: // 初始化抛射机构
+                Sling_Init();
+                break;
+                
+                case 0x00000003: // 开始执行底盘运动任务
+                //vTaskNotifyGiveFromISR(MoveTask_Handler, &pxHigherPriorityTaskWoken);
+                break;
+                
+                case 0x00000004: // 底盘锁当前点
+                xTaskNotifyFromISR(MoveTask_Handler, LOCKPOINT, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
                 break;
                 
                 case 0xFFFFFFFF: // 复位主控
-                Elmo_Close(0);
-                delay_xms(100);
                 NVIC_SystemReset();
                 break;
             }
@@ -106,7 +109,28 @@ uint8_t Checkout(RingBuf_t* Q)
             PosZ = Data.F;
             GyroEncoder_SetAng();
             break;
+            
+            case 0x30: // 抛射机构总控级别
+            switch (Data.U)
+            {
+                case 0x00000001: // 投TZ1
+                xSemaphoreGiveFromISR(JustThrowSemaphore, &pxHigherPriorityTaskWoken);
+                xTaskNotifyFromISR(FireTask_Handler, TZ1, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+                break;
+                
+                case 0x00000002: // 投TZ2
+                xSemaphoreGiveFromISR(JustThrowSemaphore, &pxHigherPriorityTaskWoken);
+                xTaskNotifyFromISR(FireTask_Handler, TZ2, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+                break;
+                
+                case 0x00000003: // 投TZ3
+                xSemaphoreGiveFromISR(JustThrowSemaphore, &pxHigherPriorityTaskWoken);
+                xTaskNotifyFromISR(FireTask_Handler, TZ3, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+                break;
+            }
+            break;
         }
+        if (pxHigherPriorityTaskWoken != pdFALSE) taskYIELD();
         return 1;
     }
     else return 0;

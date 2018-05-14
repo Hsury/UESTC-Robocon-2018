@@ -3,12 +3,12 @@
 
 #include "Includes.h"
 
-#define ARM_LOADING_POS   1775
+#define ARM_LOADING_POS   1925
 
-#define SLIDER_TZ1_POS    58000
-#define SLIDER_TZ2_POS    81000
-#define SLIDER_TZ3_POS    58000
-#define SLIDER_LOAD_POS   45000
+#define SLIDER_TZ1_POS    76000 //60000 //73000
+#define SLIDER_TZ2_POS    93000 //91000 //88000
+#define SLIDER_TZ3_POS    77000 //75000 //81000
+#define SLIDER_LOAD_POS   40000 //45000
 
 enum ARM_JOB
 {

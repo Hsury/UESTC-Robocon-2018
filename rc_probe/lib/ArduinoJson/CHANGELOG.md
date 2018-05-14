@@ -1,6 +1,12 @@
 ArduinoJson: change log
 =======================
 
+v5.13.1
+-------
+
+* Fixed `JsonVariant::operator|(int)` that returned the default value if the variant contained a double (issue #675)
+* Allowed non-quoted key to contain underscores (issue #665)
+
 v5.13.0
 -------
 

@@ -5,6 +5,8 @@
 #define ENABLE_VEL_REPORT 0
 #define ENABLE_POS_REPORT 0
 
+#define ENABLE_FIXED_DEBUG 0
+
 // C Level
 #include "stdarg.h"
 #include "stdbool.h"

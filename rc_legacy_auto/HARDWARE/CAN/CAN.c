@@ -248,14 +248,13 @@ void CAN2_RX0_IRQHandler()
             break;
             
             case 0xFF: // Reset MCU
-            Elmo_Close(0);
-            delay_xms(100);
             NVIC_SystemReset();
             break;
         }
         break;
         
         case CRADLE_CAN_ID:
+        /*
         Move_UpdateZone();
         if (RxMessage.Data[0] == 0xBB && RxMessage.Data[1] == 0x02 && Zone == TZ1)
         {
@@ -269,6 +268,7 @@ void CAN2_RX0_IRQHandler()
         {
             vTaskNotifyGiveFromISR(WirelessTask_Handler, &pxHigherPriorityTaskWoken);
         }
+        */
         break;
     }
     if (pxHigherPriorityTaskWoken != pdFALSE) taskYIELD();

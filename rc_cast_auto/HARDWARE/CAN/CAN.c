@@ -1,12 +1,12 @@
 #include "CAN.h"
 
-GPIO_InitTypeDef        GPIO_InitStructure; 
-CAN_InitTypeDef         CAN_InitStructure;
-CAN_FilterInitTypeDef   CAN_FilterInitStructure;
-NVIC_InitTypeDef        NVIC_InitStructure;
-
 void Dual_CAN_Init()
 {
+    GPIO_InitTypeDef GPIO_InitStructure; 
+    CAN_InitTypeDef CAN_InitStructure;
+    CAN_FilterInitTypeDef CAN_FilterInitStructure;
+    NVIC_InitTypeDef NVIC_InitStructure;
+    
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD | RCC_AHB1Periph_GPIOB, ENABLE);                   // GPIO时钟初始化
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_CAN1 | RCC_APB1Periph_CAN2, ENABLE);                     // CAN外设时钟初始化
 
@@ -48,6 +48,13 @@ void Dual_CAN_Init()
     CAN_FilterInitStructure.CAN_FilterFIFOAssignment = CAN_Filter_FIFO0;                           // 过滤器0关联到FIFO0
     CAN_FilterInitStructure.CAN_FilterActivation     = ENABLE;                                     // 激活过滤器0
     CAN_FilterInit(&CAN_FilterInitStructure);                                                      // 滤波器初始化
+    
+    CAN_FilterInitStructure.CAN_FilterMode           = CAN_FilterMode_IdMask;                      // 掩码过滤器
+    CAN_FilterInitStructure.CAN_FilterScale          = CAN_FilterScale_32bit;                      // 32位
+    CAN_FilterInitStructure.CAN_FilterIdHigh         = 0x0000;                                     // 32位ID
+    CAN_FilterInitStructure.CAN_FilterIdLow          = 0x0000;
+    CAN_FilterInitStructure.CAN_FilterMaskIdHigh     = 0xE000;                                     // 32位MASK
+    CAN_FilterInitStructure.CAN_FilterMaskIdLow      = 0x0000;
     CAN_FilterInitStructure.CAN_FilterNumber         = 14;                                         // 过滤器14
     CAN_FilterInitStructure.CAN_FilterFIFOAssignment = CAN_Filter_FIFO0;                           // 过滤器14关联到FIFO0
     CAN_FilterInitStructure.CAN_FilterActivation     = ENABLE;                                     // 激活过滤器14
@@ -118,6 +125,7 @@ void CAN2_RX0_IRQHandler()
     switch (RxMessage.StdId)
     {
         case GE_POS_CAN_ID:
+        Online |= (1 << 3);
         if (GESwitch)
         {
             int32_t STmp;
@@ -126,21 +134,31 @@ void CAN2_RX0_IRQHandler()
             memcpy(&STmp, &RxMessage.Data[0], 4);
             PosXTmp = Encoder2RealX(STmp);
             RealVelXTmp = (PosXTmp - PosX) / DeltaTS * 1000;
+            if (fabs(PosXTmp) > 8 || fabs(RealVelXTmp) > 10)
+            {
+                GyroEncoder_SetFlag(false);
+                break;
+            }
             RealAccX = (RealVelXTmp - RealVelX) / DeltaTS * 1000;
             RealVelX = RealVelXTmp;
             PosX = PosXTmp;
             memcpy(&STmp, &RxMessage.Data[4], 4);
             PosYTmp = Encoder2RealY(STmp);
             RealVelYTmp = (PosYTmp - PosY) / DeltaTS * 1000;
+            if (fabs(PosYTmp) > 8 || fabs(RealVelYTmp) > 10)
+            {
+                GyroEncoder_SetFlag(false);
+                break;
+            }
             RealAccY = (RealVelYTmp - RealVelY) / DeltaTS * 1000;
             RealVelY = RealVelYTmp;
             PosY = PosYTmp;
             EncoderTS = TS;
         }
-        Online |= (1 << 3);
         break;
         
         case GE_ANG_CAN_ID:
+        Online |= (1 << 3);
         if (GESwitch)
         {
             float FTmp;
@@ -149,51 +167,71 @@ void CAN2_RX0_IRQHandler()
             memcpy(&FTmp, &RxMessage.Data[0], 4);
             PosZTmp = Gyro2RealZ(FTmp - 180);
             RealVelZTmp = (DeltaAng(PosZTmp - PosZ)) / DeltaTS * 1000;
+            if (FTmp - 180 < -360 || FTmp - 180 > 180 || fabs(RealVelZTmp) > 180)
+            {
+                GyroEncoder_SetFlag(false);
+                break;
+            }
             RealAccZ = (RealVelZTmp - RealVelZ) / DeltaTS * 1000;
             RealVelZ = RealVelZTmp;
             PosZ = PosZTmp;
             GyroTS = TS;
         }
+        break;
+        
+        case DT35_X_CAN_ID:
         Online |= (1 << 4);
+        int32_t DT35XTmp;
+        memcpy(&DT35XTmp, &RxMessage.Data[0], 4);
+        DT35X = DT35XTmp / 1000.0f + DT35_X_STATIC_DIST;
         break;
         
-        case DT35_H_CAN_ID:;
-        int32_t DT35HTmp;
-        memcpy(&DT35HTmp, &RxMessage.Data[0], 4);
-        DT35H = DT35HTmp / 1000.0f + DT35_H_STATIC_DIST;
-        break;
-        
-        case DT35_F_CAN_ID:;
-        int32_t DT35FTmp;
-        memcpy(&DT35FTmp, &RxMessage.Data[0], 4);
-        DT35F = DT35FTmp / 1000.0f + DT35_F_STATIC_DIST;
-        break;
-        
-        case DT35_R_CAN_ID:;
-        int32_t DT35RTmp;
-        memcpy(&DT35RTmp, &RxMessage.Data[0], 4);
-        DT35R = DT35RTmp / 1000.0f + DT35_R_STATIC_DIST;
+        case DT35_Y_CAN_ID:
+        Online |= (1 << 5);
+        int32_t DT35YTmp;
+        memcpy(&DT35YTmp, &RxMessage.Data[0], 4);
+        DT35Y = DT35YTmp / 1000.0f + DT35_Y_STATIC_DIST;
         break;
         
         case KEYBOARD_CAN_ID:
         switch (RxMessage.Data[0])
         {
-            case 0x01: // Report Online Status
-            Probe_ReportOnline();
-            break;
-            
-            case 0x08: // OK
+            case 0x08: // 初始化
 			xTaskNotifyFromISR(FlowTask_Handler, GET_READY, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
             break;
             
-            case 0x04: // Reset MCU
-            Elmo_Close(0);
-            delay_xms(100);
-            NVIC_SystemReset();
+            case 0x02: // 发车
+			xTaskNotifyFromISR(FlowTask_Handler, LAUNCH, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
             break;
             
-            case 0x02: // Go
-			xTaskNotifyFromISR(FlowTask_Handler, LAUNCH, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            case 0x07: // 继续
+            PinFromISR();
+            DropCamera();
+            Cradle_ArriveNotify(TZ1);
+            break;
+            
+            case 0x05: // 继续
+            PinFromISR();
+            DropCamera();
+            Cradle_ArriveNotify(TZ2);
+            break;
+            
+            case 0x03: // 继续
+            PinFromISR();
+            DropCamera();
+            Cradle_ArriveNotify(TZ3);
+            break;
+                        
+            case 0x01: // 重试
+            /*
+            Move_UpdateZone();
+            Cradle_RestartNotify(Zone);
+            */
+            xTaskNotifyFromISR(FlowTask_Handler, MOVE_ON, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            break;
+            
+            case 0x04: // 复位
+            NVIC_SystemReset();
             break;
         }
         break;
@@ -202,18 +240,42 @@ void CAN2_RX0_IRQHandler()
         Move_UpdateZone();
         if (RxMessage.Data[0] == 0xBB && RxMessage.Data[1] == 0x02 && Zone == TZ1)
         {
-            //xTaskNotifyFromISR(MoveTask_Handler, TZ1_TZ2, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            xTaskNotifyFromISR(FlowTask_Handler, MOVE_ON, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
         }
         else if (RxMessage.Data[0] == 0xBB && RxMessage.Data[1] == 0x03 && Zone == TZ2)
         {
-            //xTaskNotifyFromISR(MoveTask_Handler, TZ2_TZ3, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            xTaskNotifyFromISR(FlowTask_Handler, MOVE_ON, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
         }
         else if (RxMessage.Data[0] == 0xEE && RxMessage.Data[1] == 0x01)
         {
-            //vTaskNotifyGiveFromISR(WirelessTask_Handler, &pxHigherPriorityTaskWoken);
+            vTaskNotifyGiveFromISR(WirelessTask_Handler, &pxHigherPriorityTaskWoken);
         }
+        break;
+        
+        case PROBE_ONLINE_CAN_ID:
+        Probe_ReportOnline();
         break;
     }
     if (pxHigherPriorityTaskWoken != pdFALSE) taskYIELD();
     // 在这里添加CAN2中断服务函数
 }
+
+/*
+// 陀螺仪与码盘数据异常保护
+if (!GEError && fabs(PosXTmp) > 8)
+{
+    GEError = true;
+    GEErrorTS = millis();
+    vTaskSuspend(MoveTask);
+    Omni_Elmo_Stop();
+    Buzzer_On();
+    break;
+}
+else if (GEError && fabs(PosXTmp) <= 8)
+{
+    GEError = false;
+    GEErrorDuration += millis() - GEErrorTS;
+    vTaskResume(MoveTask);
+    Buzzer_Off();
+}
+*/

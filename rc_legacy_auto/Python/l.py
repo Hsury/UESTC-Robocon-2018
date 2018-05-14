@@ -21,10 +21,12 @@ class ll():
             unpackThd.setDaemon(True)
             unpackThd.start()
             print("Listening thread started")
+            '''
             displayThd = threading.Thread(target=self.__display)
             displayThd.setDaemon(True)
             displayThd.start()
             print("Display thread started")
+            '''
         except:
             pass
     
@@ -110,12 +112,11 @@ class ll():
     def queryPeriph(self):
         self.pack(0x00, 0x00000000)
     
-    def initPeriph(self):
+    def initBase(self):
         self.pack(0x00, 0x00000001)
         v.aliveElmo1 = False
         v.aliveElmo2 = False
         v.aliveElmo3 = False
-        v.aliveGE = False
         v.PosX = 0
         v.PosY = 0
         v.AngZ = 0
@@ -123,8 +124,14 @@ class ll():
         v.VelY = 0
         v.VelZ = 0
     
-    def move(self):
+    def initSling(self):
         self.pack(0x00, 0x00000002)
+    
+    def move(self):
+        self.pack(0x00, 0x00000003)
+    
+    def lockpoint(self):
+        self.pack(0x00, 0x00000004)
     
     def resetMCU(self):
         self.pack(0x00, 0xFFFFFFFF)
@@ -180,10 +187,21 @@ class ll():
         self.pack(0x23, float(Z))
         v.AngZ = Z
     
+    def throwTZ1(self):
+        self.pack(0x30, 0x00000001)
+    
+    def throwTZ2(self):
+        self.pack(0x30, 0x00000002)
+    
+    def throwTZ3(self):
+        self.pack(0x30, 0x00000003)
+    
+    '''
     def moveTest(self, X=0, Y=0, Duration=1):
         while (not (v.aliveElmo1 and v.aliveElmo2 and v.aliveElmo3 and v.aliveGE)):
             print('Not all periphrerals are online')
-            self.initPeriph()
+            self.initBase()
+            self.initSling()
             sleep(3)
             self.queryPeriph()
             sleep(0.1)
@@ -231,3 +249,4 @@ class ll():
         self.lockBase()
         EndTS = time()
         print('Time passed: {}'.format(EndTS - startTS))
+    '''

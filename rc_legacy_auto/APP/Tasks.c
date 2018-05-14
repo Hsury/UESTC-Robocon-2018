@@ -3,6 +3,8 @@
 SemaphoreHandle_t ArrivedSemaphore;
 SemaphoreHandle_t FiredSemaphore;
 
+SemaphoreHandle_t JustThrowSemaphore;
+
 TaskHandle_t FlashTask_Handler;
 TaskHandle_t BeepTask_Handler;
 TaskHandle_t ReportTask_Handler;
@@ -73,8 +75,12 @@ void MoveTask(void *pvParameters)
     PathParam_t* PathParam;
     while (1)
     {
+        uint32_t StartTS = millis();
+        bool Arrived = false;
+        Move_PID_Start();
         switch (Path)
         {
+            case LOCKPOINT: GoalX = PosX; GoalY = PosY; GoalZ = PosZ; goto LockPoint;
             case SZ_TZ1: PathParam = &PathParam_SZ_TZ1; break;
             case TZ1_TZ2: PathParam = &PathParam_TZ1_TZ2; break;
             case TZ2_TZ3: PathParam = &PathParam_TZ2_TZ3; break;
@@ -84,39 +90,51 @@ void MoveTask(void *pvParameters)
         }
         Move_PID_SetTunings(PathParam);
         Move_PID_SetLimits(PathParam);
-        Move_PID_Start();
-        uint32_t StartTS = millis();
-        bool Arrived = false;
         while (millis() - StartTS <= PathParam->Duration)
         {
-            Move_UpdateZone();
             Move_SetGoal(PathParam, millis() - StartTS);
             Move_PID_Compute();
             Move_PID_Apply();
-            //Printf(ESP8266, "T=%u, X=%f, Y=%f, Z=%f\r\n", millis() - StartTS, VelX, VelY, VelZ);
             //Move_AddConstantFiducial(1);
-            Move_AddDerivativeFiducial(PathParam, millis() - StartTS, 0.775, 0.125, 0.825);
+            //Move_AddDerivativeFiducial(PathParam, millis() - StartTS, 0.25, 0.2, 0.8);
+            //Printf(ESP8266, "T = %u, Err = (%.3f, %.3f, %.3f), Vel = (%.3f, %.3f, %.3f)\r\n", millis() - StartTS, PosX - GoalX, PosY - GoalY, PosZ - GoalZ, VelX, VelY, VelZ);
             Omni_Elmo_PVM();
             delay_ms(5);
         }
+        LockPoint:
+        Printf(ESP8266, "Enter Lock Point Mode\r\n");
         Move_PID_SetTunings(&PathParam_LockPoint);
+        Move_PID_SetLimits(&PathParam_LockPoint);
         do
         {
-            Path = ulTaskNotifyTake(pdTRUE, 0);
-            Move_UpdateZone();
             Move_PID_Compute();
             Move_PID_Apply();
-            Move_DeadzoneCtrl(0.01, 0.2);
+            Move_DeadzoneCtrl(0.01, 0.1);
+            //if (millis() - StartTS <= 5000)
+            //Printf(ESP8266, "T = %u, Err = (%.3f, %.3f, %.3f), Vel = (%.3f, %.3f, %.3f)\r\n", millis() - StartTS, PosX - GoalX, PosY - GoalY, PosZ - GoalZ, VelX, VelY, VelZ);
             Omni_Elmo_PVM();
             delay_ms(5);
-            if (!Arrived && DeltaPos(GoalX - PosX, GoalY - PosY) <= 0.025) //Zone == (Path <= TZ2_TZ3 ? Path : TZ2)
+            if (!Arrived && DeltaPos(GoalX - PosX, GoalY - PosY) <= 0.025 && fabs(GoalZ - PosZ) <= 0.5) //Zone == (Path <= TZ2_TZ3 ? Path : TZ2)
             {
+                Move_UpdateZone();
+                Printf(ESP8266, "Arrived\r\n");
                 xSemaphoreGive(ArrivedSemaphore);
                 Cradle_ArriveNotify(Zone);
                 Probe_SetTimer(Zone - 1, millis() - StartTS);
                 xTaskNotifyGive(BeepTask_Handler);
+                /*
+                //Update 2018/04/16：色标传感器往前安装，正常情况下路径中可进行两次重定位，无需进行该操作
+                if (Zone == TZ1 || Zone == TZ2) //强行创造误差，使车再次重定位
+                {
+                    GyroEncoder_Off();
+                    PosY -= 0.10f;
+                    GyroEncoder_SetPos();
+                    GyroEncoder_On();
+                }
+                */
                 Arrived = true;
             }
+            Path = ulTaskNotifyTake(pdTRUE, 0);
         }
         while (!Path);
         Move_PID_Stop();
@@ -125,54 +143,74 @@ void MoveTask(void *pvParameters)
 
 void FireTask(void *pvParameters)
 {
+    JustThrowSemaphore = xSemaphoreCreateBinary();
     while (1)
     {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        switch (Zone)
+        uint8_t FireZone = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        if (xSemaphoreTake(JustThrowSemaphore, 0))
         {
-            case TZ1:
-            xSemaphoreTake(DimmerSemaphore, 0);                                          // 清除残余的光电门信号量
-            xSemaphoreTake(DimmerSemaphore, portMAX_DELAY);                              // 等待手动车到达TZ1触发的光电门信号量被释放
-            Sling_SliderShift(SLIDER_LOAD_POS, 120000, 0.01, 5000);
-            Sling_RotorSweep(0.15, 35000, 0.01, 5000);
-            Cylinder_On(5);
-            Sling_RotorSweep(0.15, 35000, 0.01, 5000);
-            Cylinder_Off(5);
-            Sling_SliderShift(SLIDER_TZ2_POS, 120000, 0.01, 0);
-            Sling_RotorSweep(0.75, 30000, 0.01, 0);
-            Sling_Fire(&ArmParam_TZ1, true);
+            switch (FireZone)
+            {
+                case TZ1: Sling_Fire(&ArmParam_TZ1, true); break;
+                case TZ2: Sling_Fire(&ArmParam_TZ2, true); break;
+                case TZ3: Sling_Fire(&ArmParam_TZ3, true); break;
+            }
             Sling_ArmAdjust();
-            Sling_RotorSweep(0, 30000, 0.01, 5000);
-            Sling_SliderShift(SLIDER_LOAD_POS, 120000, 0.01, 5000);
-            Sling_RotorSweep(0.10, 35000, 0.01, 5000);
-            Cylinder_On(5);
-            Sling_RotorSweep(0.15, 35000, 0.01, 5000);
-            xSemaphoreGive(FiredSemaphore);
-            Sling_SliderShift(SLIDER_TZ3_POS, 120000, 0.01, 0);
-            Sling_RotorSweep(0.70, 30000, 0.01, 0);
-            break;
-            
-            case TZ2:
-            Cylinder_Off(5);
-            Sling_Fire(&ArmParam_TZ2, true);
-            Sling_ArmAdjust();
-            xSemaphoreTake(DimmerSemaphore, 0);
-            xSemaphoreTake(DimmerSemaphore, portMAX_DELAY);
-            Sling_SliderShift(SLIDER_LOAD_POS, 120000, 0.01, 5000);
-            Sling_RotorSweep(0.15, 35000, 0.01, 5000);
-            Cylinder_On(5);
-            Sling_RotorSweep(0.15, 35000, 0.01, 5000);
-            xSemaphoreGive(FiredSemaphore);
-            Sling_SliderShift(SLIDER_TZ3_POS, 120000, 0.01, 0);
-            Sling_RotorSweep(0.75, 30000, 0.01, 0);
-            break;
-            
-            case TZ3:
-            Cylinder_Off(5);
-            Sling_Fire(&ArmParam_TZ3, true);
-            xSemaphoreGive(FiredSemaphore);
-            Sling_ArmAdjust();
-            break;
+            xTaskNotifyGive(BeepTask_Handler);
+        }
+        else
+        {
+            switch (FireZone)
+            {
+                case TZ1:
+                xSemaphoreTake(DimmerSemaphore, 0);                                          // 清除残余的光电门信号量
+                xSemaphoreTake(DimmerSemaphore, portMAX_DELAY);                              // 等待手动车到达TZ1触发的光电门信号量被释放
+                Cylinder_Off(5);                                                             // 关闭稳球装置
+                Sling_SliderShift(SLIDER_LOAD_POS, 125000, 0.005, 5000);                     // 滑块移动到给悬臂上弹位置
+                Sling_RotorSweep(0.50, 35000, 0.01, 5000);                                   // 转轴旋转到180度
+                Sling_SliderShift(SLIDER_TZ2_POS, 125000, 0.005, 0);                         // 滑块移动到TZ2的球的上弹位置
+                Sling_RotorSweep(0.55, 17500, 0.01, 0);                                      // 同时，转轴旋转到5度
+                
+                Sling_Fire(&ArmParam_TZ1, true);                                             // 同时，悬臂抛射
+                Sling_ArmAdjust();                                                           // 回收悬臂
+                
+                Sling_SliderShift(SLIDER_TZ2_POS, 125000, 0.005, 5000);                      // 等待滑块移动到TZ2的球的上弹位置
+                Sling_RotorSweep(0, 17500, 0.01, 5000);                                      // 等待转轴旋转到5度
+                            
+                Sling_SliderShift(SLIDER_LOAD_POS, 125000, 0.005, 5000);                     // 滑块移动到给悬臂上弹位置
+                Sling_RotorSweep(0.45, 35000, 0.01, 5000);                                   // 转轴旋转到180度
+                
+                xSemaphoreGive(FiredSemaphore);                                              // 同时，释放抛射机构处理完毕信号量
+                
+                Sling_SliderShift(SLIDER_TZ3_POS, 125000, 0.005, 5000);                      // 滑块移动到TZ3的球的上弹位置
+                Sling_RotorSweep(0.50, 35000, 0.01, 5000);                                   // 同时，转轴旋转到0度
+                Cylinder_On(5);
+                //xSemaphoreGive(FiredSemaphore);                                              // 同时，释放抛射机构处理完毕信号量
+                break;
+                
+                case TZ2:
+                Cylinder_Off(5);
+                delay_ms(100);
+                Sling_Fire(&ArmParam_TZ2, true);
+                Sling_ArmAdjust();
+                xSemaphoreTake(DimmerSemaphore, 0);                                          // 清除残余的光电门信号量
+                xSemaphoreTake(DimmerSemaphore, portMAX_DELAY);                              // 等待手动车到达TZ2触发的光电门信号量被释放
+                Sling_SliderShift(SLIDER_LOAD_POS, 125000, 0.005, 5000);
+                Sling_RotorSweep(0.70, 35000, 0.01, 5000);
+                Cylinder_On(5);
+                Sling_SliderShift(SLIDER_TZ3_POS, 125000, 0.005, 0);
+                Sling_RotorSweep(0.30, 35000, 0.01, 0);
+                xSemaphoreGive(FiredSemaphore);
+                break;
+                
+                case TZ3:
+                Cylinder_Off(5);
+                delay_ms(250);
+                Sling_Fire(&ArmParam_TZ3, true);
+                xSemaphoreGive(FiredSemaphore);
+                Sling_ArmAdjust();
+                break;
+            }
         }
     }
 }
@@ -204,16 +242,18 @@ void FlowTask(void *pvParameters)
     GyroEncoder_SetPos();                                                        // 更新码盘的坐标信息
     GyroEncoder_SetAng();                                                        // 更新陀螺仪的坐标信息
     GyroEncoder_On();                                                            // 继续接收陀螺仪与码盘的数据
-    Cylinder_Off(5);                                                             // 关闭稳球装置
+    Cylinder_On(5);                                                              // 打开稳球装置
     Sling_ArmAdjust();                                                           // 使用PID调节抛射臂的角度
     Sling_RotorSweep(0.82, 30000, 0.01, 0);                                      // 将旋转臂转到初始位置
-    Sling_SliderShift(SLIDER_TZ1_POS, 50000, 0.01, 5000);                        // 将滑轨移动到初始位置
+    Sling_SliderShift(SLIDER_TZ1_POS, 100000, 0.005, 5000);                      // 将滑轨移动到初始位置
     Zone = SZ;                                                                   // 将区域变量设置为SZ
     xTaskNotifyGive(BeepTask_Handler);                                           // 外设准备完毕，蜂鸣器再叫一下
     ulTaskNotifyTake(pdTRUE, 0);                                                 // 清除残余的任务通知
     
     while (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) != LAUNCH);                   // 等待[发车]指令
-    Buzzer_On(); delay_ms(250); Buzzer_Off(); delay_ms(750);                     // 蜂鸣器叫一下
+    xTaskNotifyGive(BeepTask_Handler);                                           // 蜂鸣器叫一下
+    delay_ms(1000);
+    xTaskNotifyGive(BeepTask_Handler);                                           // 蜂鸣器叫一下
     
     //测试入口
 //    Zone = TZ1;
@@ -228,28 +268,34 @@ void FlowTask(void *pvParameters)
     xSemaphoreTake(ArrivedSemaphore, 0);                                         // 清除残余的底盘到达信号量
     xSemaphoreTake(ArrivedSemaphore, portMAX_DELAY);                             // 等待底盘到达信号量被释放
     Zone = TZ1;                                                                  // 强制将区域设置到TZ1
-    xTaskNotifyGive(FireTask_Handler);                                           // 抛射机构开始执行上弹及抛射任务
+    xTaskNotify(FireTask_Handler, TZ1, eSetValueWithOverwrite);                  // 抛射机构开始执行上弹及抛射任务
     xSemaphoreTake(FiredSemaphore, 0);                                           // 清除残余的抛射完成信号量
     xSemaphoreTake(FiredSemaphore, portMAX_DELAY);                               // 等待抛射完成信号量被释放
     
-    for (uint8_t i = 0; i < 5; i++)
-    Buzzer_On(); delay_ms(250); Buzzer_Off(); delay_ms(750);
+    for (uint8_t i = 0; i < 3; i++)
+    {
+        Buzzer_On(); delay_ms(250); Buzzer_Off(); delay_ms(250);
+    }
     
     xTaskNotify(MoveTask_Handler, TZ1_TZ2, eSetValueWithOverwrite);              // 底盘开始跑TZ1->TZ2的路径
     xSemaphoreTake(ArrivedSemaphore, 0);                                         // 清除残余的底盘到达信号量
     xSemaphoreTake(ArrivedSemaphore, portMAX_DELAY);                             // 等待底盘到达信号量被释放
     Zone = TZ2;                                                                  // 强制将区域设置到TZ2
-    xTaskNotifyGive(FireTask_Handler);                                           // 抛射机构开始执行上弹及抛射任务
+    xTaskNotify(FireTask_Handler, TZ2, eSetValueWithOverwrite);                  // 抛射机构开始执行上弹及抛射任务
     xSemaphoreTake(FiredSemaphore, 0);                                           // 清除残余的抛射完成信号量
     xSemaphoreTake(FiredSemaphore, portMAX_DELAY);                               // 等待抛射完成信号量被释放
     
-    Buzzer_On(); delay_ms(250); Buzzer_Off(); delay_ms(750);
+    //ulTaskNotifyTake(pdTRUE, 0);
+    //while (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) != LAUNCH);
+    xTaskNotifyGive(BeepTask_Handler);
+    delay_ms(250);
     
     xTaskNotify(MoveTask_Handler, TZ2_TZ3, eSetValueWithOverwrite);              // 底盘开始跑TZ2->TZ3的路径
     xSemaphoreTake(ArrivedSemaphore, 0);                                         // 清除残余的底盘到达信号量
     xSemaphoreTake(ArrivedSemaphore, portMAX_DELAY);                             // 等待底盘到达信号量被释放
     Zone = TZ3;                                                                  // 强制将区域设置到TZ3
-    xTaskNotifyGive(FireTask_Handler);                                           // 抛射机构开始执行上弹及抛射任务
+    delay_ms(500);
+    xTaskNotify(FireTask_Handler, TZ3, eSetValueWithOverwrite);                  // 抛射机构开始执行上弹及抛射任务
     xSemaphoreTake(FiredSemaphore, 0);                                           // 清除残余的抛射完成信号量
     xSemaphoreTake(FiredSemaphore, portMAX_DELAY);                               // 等待抛射完成信号量被释放
     
@@ -260,8 +306,12 @@ void FlowTask(void *pvParameters)
     while (1)
     {
         xSemaphoreTake(DimmerSemaphore, 0);                                          // 清除残余的光电门信号量
-        xSemaphoreTake(DimmerSemaphore, portMAX_DELAY);                              // 等待手动车到达TZ3触发的光电门信号量被释放
-        xTaskNotifyGive(FireTask_Handler);                                           // 抛射机构开始执行上弹及抛射任务
+        xSemaphoreTake(DimmerSemaphore, portMAX_DELAY);                              // 等待TZ3触发的光电门信号量被释放
+        Cylinder_On(5);
+        delay_ms(250);
+        Cylinder_Off(5);
+        delay_ms(100);
+        xTaskNotify(FireTask_Handler, TZ3, eSetValueWithOverwrite);                  // 抛射机构开始执行上弹及抛射任务
         xSemaphoreTake(FiredSemaphore, 0);                                           // 清除残余的抛射完成信号量
         xSemaphoreTake(FiredSemaphore, portMAX_DELAY);                               // 等待抛射完成信号量被释放
     }

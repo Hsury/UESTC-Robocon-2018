@@ -13,7 +13,7 @@ class Editor():
     UESTC 2018 Robocon Team
     Editor
     '''
-    def __init__(self, degree=2, sampling=500):
+    def __init__(self, degree=3, sampling=500):
         try:
             mp.set_start_method('spawn')
         except:
@@ -26,7 +26,7 @@ class EditorWindow(QWidget):
     ARROW_SIZE = 15
     MARGIN = [1.5, 0.5]
 
-    def __init__(self, degree=2, sampling=500):
+    def __init__(self, degree=3, sampling=500):
         app = QApplication(sys.argv)
         super(EditorWindow, self).__init__()
         self._degree = degree
@@ -235,4 +235,4 @@ class EditorWindow(QWidget):
         textPainter.drawText(QPoint(EditorWindow.MARGIN[0] / self._ratioX, EditorWindow.MARGIN[1] / self._ratioY +  260), "Z: %.2f deg" % (self._endList[self._endIdx][2] / pi * 180))
 
 if __name__=='__main__':
-    editor = Editor(2, 500)
+    editor = Editor(3, 500)

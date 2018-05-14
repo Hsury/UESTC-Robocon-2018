@@ -21,7 +21,7 @@
 #define DT35_F_R_GAP           (0.0f)            // 两颗DT35的间距
 
 #define PHOTO_SENSOR_X_DIST    (0.39f)           // X轴光电传感器至过机器中心Y轴的距离
-#define PHOTO_SENSOR_Y_DIST    (0.26f)           // Y轴光电传感器至过机器中心X轴的距离
+#define PHOTO_SENSOR_Y_DIST    (0.18f)           // Y轴光电传感器至过机器中心X轴的距离
 
 #define clamp(x, lower, upper) (x >= upper ? upper : (x <= lower ? lower : x))
 

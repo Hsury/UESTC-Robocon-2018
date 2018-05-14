@@ -132,9 +132,9 @@ uint32_t Elmo_Init(CAN_TypeDef* CANx, uint8_t PPr, uint8_t SPr)
     /* 初始化加速度 */
     RPDO2_Cmd_data(&elmo[0], (uint8_t *)"PM", 0, TYPE_INTEGER, 0x01);
     Elmo_Delay100us_IDx(&elmo[0],40);    
-    RPDO2_Cmd_data(&elmo[0], (uint8_t *)"AC", 0, TYPE_INTEGER, 250000000);
+    RPDO2_Cmd_data(&elmo[0], (uint8_t *)"AC", 0, TYPE_INTEGER, 1000000000);
     Elmo_Delay100us_IDx(&elmo[0],40);
-    RPDO2_Cmd_data(&elmo[0], (uint8_t *)"DC", 0, TYPE_INTEGER, 500000000);
+    RPDO2_Cmd_data(&elmo[0], (uint8_t *)"DC", 0, TYPE_INTEGER, 1000000000);
     Elmo_Delay100us_IDx(&elmo[0],40);
 
     /* Enter in SCM */
@@ -173,9 +173,9 @@ void Elmo_Reinit(uint8_t elmoID)
     /* 初始化加速度 */
     RPDO2_Cmd_data(&elmo[0], (uint8_t *)"PM", 0, TYPE_INTEGER, 0x01);
     Elmo_Delay100us_IDx(&elmo[elmoID],20); //最大加速度1000000000 1000000
-    RPDO2_Cmd_data(&elmo[0], (uint8_t *)"AC", 0, TYPE_INTEGER, 250000000);
+    RPDO2_Cmd_data(&elmo[0], (uint8_t *)"AC", 0, TYPE_INTEGER, 1000000000);
     Elmo_Delay100us_IDx(&elmo[elmoID],40); //最大减速度1000000000
-    RPDO2_Cmd_data(&elmo[0], (uint8_t *)"DC", 0, TYPE_INTEGER, 500000000);
+    RPDO2_Cmd_data(&elmo[0], (uint8_t *)"DC", 0, TYPE_INTEGER, 1000000000);
     Elmo_Delay100us_IDx(&elmo[elmoID],40);             
     
     /* 关闭驱动 */
@@ -916,6 +916,11 @@ void Omni_Elmo_Stop()
 */
 void Omni_Elmo_PVM()
 {
+    //解算前的最后一次限幅保护
+    VelX = clamp(VelX, -5, 5);
+    VelY = clamp(VelY, -5, 5);
+    VelZ = clamp(VelZ, -180, 180);
+    
     /* 设置目标速度 */
     RPDO2_Cmd_data(&elmo[1], (uint8_t *)"JV", 0, TYPE_INTEGER, Real2ElmoHead);
     RPDO2_Cmd_data(&elmo[2], (uint8_t *)"JV", 0, TYPE_INTEGER, Real2ElmoLeft);
@@ -1944,19 +1949,15 @@ static uint32_t f2h(float x)
 */
 void Elmo_Read_POS(uint8_t elmoID)
 {
-    #if ENABLE_SLING_DEBUG
     //开启TPDO2
-    RSDO(&elmo[elmoID], 0x1A01, 0x00,1);
-    Elmo_Delay100us_IDx(&elmo[elmoID],5);
-    #endif
+    //RSDO(&elmo[elmoID], 0x1A01, 0x00,1);
+    //Elmo_Delay100us_IDx(&elmo[elmoID],5);
     //读取elmo编码器的数值
     RPDO2_Cmd_string(&elmo[elmoID], (uint8_t *)"PX");
     Elmo_Delay100us_IDx(&elmo[elmoID],2);
-    #if ENABLE_SLING_DEBUG
     //关闭TPDO2
-    RSDO(&elmo[elmoID], 0x1A01, 0x00,0);
-    Elmo_Delay100us_IDx(&elmo[elmoID],5);
-    #endif
+    //RSDO(&elmo[elmoID], 0x1A01, 0x00,0);
+    //Elmo_Delay100us_IDx(&elmo[elmoID],5);
 }
 
 /**

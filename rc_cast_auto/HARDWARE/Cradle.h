@@ -5,5 +5,7 @@
 
 void Cradle_ArriveNotify(uint8_t TZx);
 void Cradle_RestartNotify(uint8_t TZx);
+void Cradle_RetryNotify(uint8_t TZx);
+void Cradle_ReturnNotify(void);
 
 #endif

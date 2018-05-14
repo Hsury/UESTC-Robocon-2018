@@ -1,24 +1,27 @@
-/*-----------------------------------------------------------------------------*
- * DS3231/DS3232 Alarm Example #1                                              *
- *                                                                             *
- * Set Alarm 1 to occur once a minute at 5 seconds after the minute.           *
- * Detect the alarm by polling the RTC alarm flag.                             *
- *                                                                             *
- * Hardware:                                                                   *
- * Arduino Uno, DS3231 RTC.                                                    *
- * Connect RTC SDA to Arduino pin A4.                                          *
- * Connect RTC SCL to Arduino pin A5.                                          *
- *                                                                             *
- * Jack Christensen 16Sep2017                                                  *
- *-----------------------------------------------------------------------------*/
- 
-#include <DS3232RTC.h>      // http://github.com/JChristensen/DS3232RTC
+// Arduino DS3232RTC Library
+// https://github.com/JChristensen/DS3232RTC
+// Copyright (C) 2018 by Jack Christensen and licensed under
+// GNU GPL v3.0, https://www.gnu.org/licenses/gpl.html
+//
+// DS3231/DS3232 Alarm Example Sketch #1
+//
+// Set Alarm 1 to occur once a minute at 5 seconds after the minute.
+// Detect the alarm by polling the RTC alarm flag.
+//
+// Hardware:
+// Arduino Uno, DS3231 RTC.
+// Connect RTC SDA to Arduino pin A4.
+// Connect RTC SCL to Arduino pin A5.
+//
+// Jack Christensen 16Sep2017
+
+#include <DS3232RTC.h>      // https://github.com/JChristensen/DS3232RTC
 #include <Streaming.h>      // http://arduiniana.org/libraries/streaming/
 
 void setup()
 {
     Serial.begin(115200);
-    
+
     // initialize the alarms to known values, clear the alarm flags, clear the alarm interrupt flags
     RTC.setAlarm(ALM1_MATCH_DATE, 0, 0, 0, 1);
     RTC.setAlarm(ALM2_MATCH_DATE, 0, 0, 0, 1);
@@ -30,7 +33,7 @@ void setup()
 
     // set the RTC time and date to the compile time
     RTC.set(compileTime());
-    
+
     // set Alarm 1 to occur at 5 seconds after every minute
     RTC.setAlarm(ALM1_MATCH_SECONDS, 5, 0, 0, 1);
     // clear the alarm flag
@@ -89,4 +92,3 @@ time_t compileTime()
     time_t t = makeTime(tm);
     return t + FUDGE;        //add fudge factor to allow for compile time
 }
-
