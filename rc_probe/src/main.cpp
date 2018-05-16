@@ -13,7 +13,7 @@
                         ===== UESTC Robot Probe For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/05/14
+                                        VERSION 2018/05/17
 
 */
 
@@ -50,7 +50,7 @@ TODO List:
 #include "bitmap.h"
 
 #define HW_NAME "AR"
-#define SW_NAME "2018/05/14"
+#define SW_NAME "2018/05/17"
 
 #define USE_STATIC_IP_ADDRESS 0
 #define ENABLE_TOUCH_CALIBRATE 0
@@ -1293,13 +1293,13 @@ void CANRecvTask(void * pvParameters)
                 case DT35_X_ID:
                 DeviceNotify[2] = millis();
                 memcpy(&STmp, &CAN_rx_frame.data.u8[0], 4);
-                DT35[0] = STmp / 1000.0f + 0.46; // / 1000.0f + 0.46
+                DT35[0] = STmp / 1000.0f + 0.532;
                 break;
 
                 case DT35_Y_ID:
                 DeviceNotify[3] = millis();
                 memcpy(&STmp, &CAN_rx_frame.data.u8[0], 4);
-                DT35[1] = STmp / 1000.0f + 0.49; // / 1000.0f + 0.49
+                DT35[1] = STmp / 1000.0f + 0.472;
                 break;
 
                 case MR_ID:
@@ -1339,15 +1339,6 @@ void CANRecvTask(void * pvParameters)
                         Log("Robot arrived in TZ1\r\n");
                         //AddToPlaylist(2);
                         //AddToPlaylist(16);
-                        for (uint8_t i = 0; i < 5; i++)
-                        {
-                            udp.beginPacket(UDP_ADDRESS, UDP_PORT);
-                            udp.write(0xA0);
-                            udp.endPacket();
-                        }
-                        Log("Cradle is ready\r\n");
-                        AddToPlaylist(2);
-                        AddToPlaylist(20);
                     }
                     else if (CAN_rx_frame.data.u8[1] == 0x02) // In TZ2
                     {

@@ -13,7 +13,7 @@
                     ===== UESTC Cast Auto Robot 3rd For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/05/14
+                                        VERSION 2018/05/17
 
 */
 
@@ -67,7 +67,7 @@ int main(void)
     Buzzer_Init();
     RGBLED_Init();
     Cylinder_Init();
-	//Sensor_Init();
+	Sensor_Init();
     Elmo_Init(CAN1, 9, 0);
     Elmo_Close(0);
     xTaskCreate(InitTask, "Init Task", 128, NULL, 1, &InitTask_Handler);

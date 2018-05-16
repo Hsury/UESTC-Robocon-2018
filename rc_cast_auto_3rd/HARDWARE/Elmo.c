@@ -924,8 +924,8 @@ void Omni_Elmo_PVM()
     */
     
     /* 设置目标速度 */
-    RPDO2_Cmd_data(&elmo[1], (uint8_t *)"JV", 0, TYPE_INTEGER, Real2ElmoLeft);
-    RPDO2_Cmd_data(&elmo[2], (uint8_t *)"JV", 0, TYPE_INTEGER, Real2ElmoHead);
+    RPDO2_Cmd_data(&elmo[1], (uint8_t *)"JV", 0, TYPE_INTEGER, Real2ElmoHead);
+    RPDO2_Cmd_data(&elmo[2], (uint8_t *)"JV", 0, TYPE_INTEGER, Real2ElmoLeft);
     RPDO2_Cmd_data(&elmo[3], (uint8_t *)"JV", 0, TYPE_INTEGER, Real2ElmoRight);
     Elmo_Delay100us_IDx(&elmo[1],10);
     Elmo_Delay100us_IDx(&elmo[2],10);

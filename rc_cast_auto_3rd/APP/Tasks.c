@@ -140,7 +140,7 @@ void MoveTask(void *pvParameters)
         Move_PID_SetLimits(&PathParam_LockPoint);
         do
         {
-            if (!Arrived && DeltaPos(GoalX - PosX, GoalY - PosY) <= 0.03 && fabs(GoalZ - PosZ) <= 0.5 && DeltaPos(RealVelX, RealVelY) <= 0.20)
+            if (!Arrived && DeltaPos(GoalX - PosX, GoalY - PosY) <= 0.05 && fabs(GoalZ - PosZ) <= 0.5 && DeltaPos(RealVelX, RealVelY) <= 0.50)
             {
                 if (Path != LOCKPOINT && PIN_WHEN_ARRIVE)
                 {
@@ -191,7 +191,7 @@ void FlowTask(void *pvParameters)
     
     xTaskNotifyGive(BeepTask_Handler);                                           // 蜂鸣器叫一下
     Cradle_ReturnNotify();                                                       // 通知二维平台初始化
-    delay_ms(50);                                                                // 按键消抖
+    delay_ms(100);                                                               // 按键消抖
     ulTaskNotifyTake(pdTRUE, 0);                                                 // 清除残余的任务通知    
     
     while (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(2000)) != GET_READY)           // 等待第二次[预备]指令
@@ -209,6 +209,7 @@ void FlowTask(void *pvParameters)
     GyroEncoder_SetPos();                                                        // 更新码盘的坐标信息
     GyroEncoder_SetAng();                                                        // 更新陀螺仪的坐标信息
     GyroEncoder_On();                                                            // 继续接收陀螺仪与码盘的数据
+    delay_ms(100);                                                               // 按键消抖
     ulTaskNotifyTake(pdTRUE, 0);                                                 // 清除残余的任务通知
     
     while (1)

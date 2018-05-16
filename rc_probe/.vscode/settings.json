@@ -4,6 +4,8 @@
         "PLATFORMIO_CALLER": "vscode"
     },
     "files.associations": {
-        "cstdio": "cpp"
+        "cstdio": "cpp",
+        "array": "cpp",
+        "initializer_list": "cpp"
     }
 }

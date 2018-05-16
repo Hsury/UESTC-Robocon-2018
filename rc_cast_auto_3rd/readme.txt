@@ -13,6 +13,6 @@
                     ===== UESTC Cast Auto Robot 3rd For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/05/14
+                                        VERSION 2018/05/17
 
 */
