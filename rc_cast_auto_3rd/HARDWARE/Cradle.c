@@ -17,7 +17,7 @@ void Cradle_RestartNotify(uint8_t TZx)
 {
     if (TZx < 1 || TZx > 3) return;
     CanTxMsg TxMessage;
-    TxMessage.StdId = CRADLE_CAN_ID;
+    TxMessage.StdId = KEYBOARD_CAN_ID;
     TxMessage.IDE = CAN_ID_STD;
     TxMessage.RTR = CAN_RTR_DATA;
     TxMessage.DLC = 2;
@@ -47,6 +47,18 @@ void Cradle_ReturnNotify()
     TxMessage.RTR = CAN_RTR_DATA;
     TxMessage.DLC = 2;
     TxMessage.Data[0] = 0xCC;
+    TxMessage.Data[1] = 0x01;
+    CAN2_Send(&TxMessage);
+}
+
+void Cradle_AdjustNotify()
+{
+    CanTxMsg TxMessage;
+    TxMessage.StdId = CRADLE_CAN_ID;
+    TxMessage.IDE = CAN_ID_STD;
+    TxMessage.RTR = CAN_RTR_DATA;
+    TxMessage.DLC = 2;
+    TxMessage.Data[0] = 0xAB;
     TxMessage.Data[1] = 0x01;
     CAN2_Send(&TxMessage);
 }

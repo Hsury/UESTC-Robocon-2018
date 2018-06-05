@@ -6,7 +6,7 @@
 extern uint32_t Online;
 
 extern uint8_t Zone;
-extern bool Retry;
+extern uint8_t Retry;
 
 extern float RealAccX;
 extern float RealAccY;

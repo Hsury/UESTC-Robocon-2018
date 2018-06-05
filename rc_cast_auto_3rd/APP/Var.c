@@ -3,7 +3,7 @@
 uint32_t Online = 0x00000000;
 
 uint8_t Zone = SZ;
-bool Retry = false;
+uint8_t Retry = 0;
 
 float RealAccX = 0;
 float RealAccY = 0;

@@ -47,10 +47,10 @@ void InitTask(void *pvParameters)
     //ESP8266_ExitTransLink();
     //ESP8266_UARTConfig(921600);
     //ESP8266_WiFiModeConfig(SOFTAP_STATION);
-    //ESP8266_StationConfig("HsuRY", "***REMOVED***");
+    //ESP8266_StationConfig("HsuRY", "HSURY.COM");
     //ESP8266_StationDHCPConfig(true);
     //ESP8266_StationIPConfig("192.168.1.234", "192.168.1.1", "255.255.255.0");
-    //ESP8266_SoftAPConfig("HsuRY's STM32F407", "***REMOVED***", 6, WPA2_PSK, 2, false);
+    //ESP8266_SoftAPConfig("HsuRY's STM32F407", "HSURY.COM", 6, WPA2_PSK, 2, false);
     //ESP8266_TransLinkConfig("192.168.1.233", 2333, UDP, 2333);
     //ESP8266_Reset();
     

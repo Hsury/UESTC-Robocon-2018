@@ -11,8 +11,8 @@
 
 #define SUBWHEEL_DIAMETER      (50.7f)           // 码盘从动轮直径（毫米）
 
-#define DT35_X_STATIC_DIST     (0.532f)          // 左侧DT35传感器距离车Y轴距离
-#define DT35_Y_STATIC_DIST     (0.472f)          // 后侧DT35传感器距离车X轴距离
+#define DT35_X_STATIC_DIST     (0.889f)          // 左侧DT35传感器距离车Y轴距离
+#define DT35_Y_STATIC_DIST     (0.0f)          // 后侧DT35传感器距离车X轴距离
 
 #define PHOTO_SENSOR_X_DIST    (0.43f)           // X轴光电传感器至过机器中心Y轴的距离
 #define PHOTO_SENSOR_Y_DIST    (0.17f)           // Y轴光电传感器至过机器中心X轴的距离

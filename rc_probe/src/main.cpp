@@ -13,7 +13,7 @@
                         ===== UESTC Robot Probe For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/05/17
+                                        VERSION 2018/06/01
 
 */
 
@@ -50,7 +50,7 @@ TODO List:
 #include "bitmap.h"
 
 #define HW_NAME "AR"
-#define SW_NAME "2018/05/17"
+#define SW_NAME "2018/06/01"
 
 #define USE_STATIC_IP_ADDRESS 0
 #define ENABLE_TOUCH_CALIBRATE 0
@@ -58,11 +58,11 @@ TODO List:
 #define UPDATE_RTC_TIME 0
 #define NOTIFY_DEVICE_NUM 4
 
-const char* AP_SSID      = "AR_Probe";
-const char* AP_PASSWORD  = "***REMOVED***";
+const char* AP_SSID      = "AR-Probe";
+const char* AP_PASSWORD  = "duoguanyuenan8";
 
-const char* STA_SSID     = "Robocon-WiFi";
-const char* STA_PASSWORD = "***REMOVED***";
+const char* STA_SSID     = "UESTC-Robocon-WiFi";
+const char* STA_PASSWORD = "duoguanyuenan8";
 
 #if USE_STATIC_IP_ADDRESS
 IPAddress LOCAL_IP(192, 168, 1, 45);
@@ -76,8 +76,8 @@ const int UDP_PORT = 2019;
 struct ProbeConfig
 {
     uint8_t volume = 5;
-    boolean hideSSID = false;
-    boolean rawUART = false;
+    bool hideSSID = false;
+    bool rawUART = false;
 } config;
 
 #define CAN_RX_PIN GPIO_NUM_4
@@ -196,11 +196,14 @@ float Gyroscope;
 float Encoder[2]; // X-Y coordinate
 float DT35[2]; // X-Y coordinate
 
-boolean isRTC = false;
-boolean isWiFiConnected = false;
-boolean isUpdating = false;
-boolean isSDCardInserted = false;
-boolean isRecording = false;
+uint8_t TxRemote = 0x00;
+uint8_t RxRemote = 0x00;
+
+bool isRTC = false;
+bool isWiFiConnected = false;
+bool isUpdating = false;
+bool isSDCardInserted = false;
+bool isRecording = false;
 
 // NOTE: If we create a 16-bit Sprite, 320 x 240 x 2 bytes RAM is occupied, not a good choice
 
@@ -222,6 +225,7 @@ void TouchscreenCalibrate();
 void readConfig();
 void writeConfig();
 
+void RemoteHandle(uint8_t Tx = 0x00);
 void Log(const char * format, ...);
 uint16_t Rainbow(uint8_t Value);
 
@@ -326,9 +330,9 @@ void setup() {
     Debug.setResetCmdEnabled(true); // Enable the reset command
     String helpCmd = "demo - Try different levels of debug message\r\n";
 	helpCmd.concat("count - Drive the speaker to count from 1 to 4\r\n");
-    helpCmd.concat("r11 - Send TZ1 1st retry command to cradle\r\n");
-    helpCmd.concat("r12 - Send TZ1 2nd retry command to cradle\r\n");
-    helpCmd.concat("r21 - Send TZ2 1st retry command to cradle");
+    helpCmd.concat("r1 - Send TZ1 1st retry command to cradle\r\n");
+    helpCmd.concat("r2 - Send TZ1 2nd retry command to cradle\r\n");
+    helpCmd.concat("r3 - Send TZ2 1st retry command to cradle");
 	Debug.setHelpProjectsCmds(helpCmd);
 	Debug.setCallBackProjectCmds(&processCmdRemoteDebug);
     Log("Telnet service started");
@@ -390,73 +394,7 @@ void setup() {
 }
 
 void loop() {
-    if (isWiFiConnected && udp.parsePacket())
-    {
-        xTaskNotifyGive(HeartbeatAnimeTaskHandle);
-        while (udp.available())
-        {
-            uint8_t tmp = udp.read();
-            if (tmp == 0x11) // Retry command from MR received
-            {
-                CAN_tx_frame.MsgID = Cradle_ID;
-                CAN_tx_frame.FIR.B.DLC = 2;
-                CAN_tx_frame.data.u8[0] = 0xFF;
-                CAN_tx_frame.data.u8[1] = 0x11;
-                ESP32Can.CANWriteFrame(&CAN_tx_frame);
-                udp.beginPacket(UDP_ADDRESS, UDP_PORT);
-                udp.write(0xAC);
-                udp.endPacket();
-                Log("TZ1 1st retry command sent to cradle");
-            }
-            else if (tmp == 0x12)
-            {
-                CAN_tx_frame.MsgID = Cradle_ID;
-                CAN_tx_frame.FIR.B.DLC = 2;
-                CAN_tx_frame.data.u8[0] = 0xFF;
-                CAN_tx_frame.data.u8[1] = 0x12;
-                ESP32Can.CANWriteFrame(&CAN_tx_frame);
-                udp.beginPacket(UDP_ADDRESS, UDP_PORT);
-                udp.write(0xAC);
-                udp.endPacket();
-                Log("TZ1 2nd retry command sent to cradle");
-            }
-            else if (tmp == 0x21)
-            {
-                CAN_tx_frame.MsgID = Cradle_ID;
-                CAN_tx_frame.FIR.B.DLC = 2;
-                CAN_tx_frame.data.u8[0] = 0xFF;
-                CAN_tx_frame.data.u8[1] = 0x21;
-                ESP32Can.CANWriteFrame(&CAN_tx_frame);
-                udp.beginPacket(UDP_ADDRESS, UDP_PORT);
-                udp.write(0xAC);
-                udp.endPacket();
-                Log("TZ2 1st retry command sent to cradle");
-            }
-            else if (tmp == 0xA0)
-            {
-                CAN_tx_frame.MsgID = MR_ID;
-                CAN_tx_frame.FIR.B.DLC = 2;
-                CAN_tx_frame.data.u8[0] = 0xFF;
-                CAN_tx_frame.data.u8[1] = 0xA0;
-                ESP32Can.CANWriteFrame(&CAN_tx_frame);
-                Log("Throw notification from AR received");
-            }
-            else if (tmp == 0xAC)
-            {
-                CAN_tx_frame.MsgID = MR_ID;
-                CAN_tx_frame.FIR.B.DLC = 2;
-                CAN_tx_frame.data.u8[0] = 0xFF;
-                CAN_tx_frame.data.u8[1] = 0xAC;
-                ESP32Can.CANWriteFrame(&CAN_tx_frame);
-                Log("Retry ACK from AR received");
-            }
-            else continue;
-            audioController.stop();
-            audioController.playFileIndex(2);
-            udp.flush(); // Necessary
-            break;
-        }
-    }
+    RemoteHandle();
     ArduinoOTA.handle();
     Debug.handle();
     ftpSrv.handleFTP();
@@ -592,15 +530,15 @@ void TFTTask(void * pvParameters)
 
     uint8_t scene = 0;
     uint8_t subScene = 0;
-    boolean redraw = true; // Whether to redraw static parts of a scene
+    bool redraw = true; // Whether to redraw static parts of a scene
     uint16_t xPos = 0, yPos = 16; // To store command interface coordinates
-    boolean pressed;
+    bool pressed;
     uint16_t xTouch = 0, yTouch = 0; // To store the touch coordinates
     char tmp;
     uint8_t trayPos = 1; // To store how many icons are shown in the tray (WiFi is always there)
-    boolean pause = false; // Whether to pause refresh in a page
+    bool pause = false; // Whether to pause refresh in a page
     uint8_t LogPage = 1;
-    boolean LogFollow = true;
+    bool LogFollow = true;
     while (1)
     {
         // Display control code is below
@@ -622,8 +560,8 @@ void TFTTask(void * pvParameters)
                 tft.pushImage(0, 0, 168, 24, bitmap_uestc_banner);
                 redraw = false;
             }
-            if (isWiFiConnected) tft.pushImage(320 - 24, 0, 24, 24, bitmap_wifi_connected);
-            else tft.pushImage(320 - 24, 0, 24, 24, bitmap_wifi_disconnected);
+            if (isWiFiConnected) tft.pushImage(320 - 24, 0, 24, 24, bitmap_debug);
+            //else tft.pushImage(320 - 24, 0, 24, 24, bitmap_wifi_disconnected);
             trayPos = 1; // Reset the tray position
             if (isSDCardInserted)
             {
@@ -1293,41 +1231,19 @@ void CANRecvTask(void * pvParameters)
                 case DT35_X_ID:
                 DeviceNotify[2] = millis();
                 memcpy(&STmp, &CAN_rx_frame.data.u8[0], 4);
-                DT35[0] = STmp / 1000.0f + 0.532;
+                DT35[0] = (STmp / 1000.0 + 0.889) * cos(Gyroscope / 180 * PI);
                 break;
 
                 case DT35_Y_ID:
                 DeviceNotify[3] = millis();
                 memcpy(&STmp, &CAN_rx_frame.data.u8[0], 4);
-                DT35[1] = STmp / 1000.0f + 0.472;
+                DT35[1] = (STmp / 1000.0 + 0.0) * cos(Gyroscope / 180 * PI);
                 break;
 
                 case MR_ID:
                 if (CAN_rx_frame.data.u8[0] == 0xFF) // Packet asking AR to retry giving from MR
                 {
-                    switch (CAN_rx_frame.data.u8[1])
-                    {
-                        case 0x11:
-                        udp.beginPacket(UDP_ADDRESS, UDP_PORT);
-                        udp.write(0x11);
-                        udp.endPacket();
-                        Log("TZ1 1st retry command sent to AR");
-                        break;
-
-                        case 0x12:
-                        udp.beginPacket(UDP_ADDRESS, UDP_PORT);
-                        udp.write(0x12);
-                        udp.endPacket();
-                        Log("TZ1 2nd retry command sent to AR");
-                        break;
-
-                        case 0x21:
-                        udp.beginPacket(UDP_ADDRESS, UDP_PORT);
-                        udp.write(0x21);
-                        udp.endPacket();
-                        Log("TZ2 1st retry command sent to AR");
-                        break;
-                    }
+                    RemoteHandle(CAN_rx_frame.data.u8[1]);
                 }
                 break;
 
@@ -1353,14 +1269,9 @@ void CANRecvTask(void * pvParameters)
                         //AddToPlaylist(18);
                     }
                 }
-                else if (CAN_rx_frame.data.u8[0] == 0xEE && CAN_rx_frame.data.u8[1] == 0x01) // Cradle reports that it is ready to receive another shuttlecock
+                else if (CAN_rx_frame.data.u8[0] == 0xEE) // Cradle reports that it is ready to receive another shuttlecock
                 {
-                    for (uint8_t i = 0; i < 5; i++)
-                    {
-                        udp.beginPacket(UDP_ADDRESS, UDP_PORT);
-                        udp.write(0xA0);
-                        udp.endPacket();
-                    }
+                    RemoteHandle(CAN_rx_frame.data.u8[1]);
                     Log("Cradle is ready\r\n");
                     AddToPlaylist(2);
                     AddToPlaylist(20);
@@ -1452,7 +1363,7 @@ void RobotSelftestTask(void * pvParameters)
 {
     AddToPlaylist(2);
     AddToPlaylist(4);
-    boolean isOnline[NOTIFY_DEVICE_NUM + 1]; // Preserve index 0 as global status
+    bool isOnline[NOTIFY_DEVICE_NUM + 1]; // Preserve index 0 as global status
     uint32_t SelftestBegin = millis();
     uint32_t SelftestEnd = millis() + 5E3; // Set robot selftest timeout to 5 seconds
     while (millis() < SelftestEnd)
@@ -1539,7 +1450,7 @@ void processCmdRemoteDebug()
             AddToPlaylist(14);
             AddToPlaylist(15);
         }
-        else if (lastCmd == "r11")
+        else if (lastCmd == "r1")
         {
             CAN_tx_frame.MsgID = Cradle_ID;
             CAN_tx_frame.FIR.B.DLC = 2;
@@ -1550,7 +1461,7 @@ void processCmdRemoteDebug()
             audioController.stop();
             audioController.playFileIndex(2);
         }
-        else if (lastCmd == "r12")
+        else if (lastCmd == "r2")
         {
             CAN_tx_frame.MsgID = Cradle_ID;
             CAN_tx_frame.FIR.B.DLC = 2;
@@ -1561,12 +1472,12 @@ void processCmdRemoteDebug()
             audioController.stop();
             audioController.playFileIndex(2);
         }
-        else if (lastCmd == "r21")
+        else if (lastCmd == "r3")
         {
             CAN_tx_frame.MsgID = Cradle_ID;
             CAN_tx_frame.FIR.B.DLC = 2;
             CAN_tx_frame.data.u8[0] = 0xFF;
-            CAN_tx_frame.data.u8[1] = 0x21;
+            CAN_tx_frame.data.u8[1] = 0x13;
             ESP32Can.CANWriteFrame(&CAN_tx_frame);
             Log("TZ2 1st retry command sent to cradle");
             audioController.stop();
@@ -1630,6 +1541,51 @@ void writeConfig()
     if (root.printTo(internalConfigFile)) Log("Config saved to SPIFFS");
     else Log("Config cannot be saved to SPIFFS");
     internalConfigFile.close();
+}
+
+void RemoteHandle(uint8_t Tx)
+{
+    // Tx
+    if (Tx && Tx < 0x80) TxRemote = Tx;
+    if (TxRemote)
+    {
+        udp.beginPacket(UDP_ADDRESS, UDP_PORT);
+        udp.write(TxRemote);
+        udp.endPacket();
+    }
+    // Rx
+    if (isWiFiConnected && udp.parsePacket())
+    {
+        xTaskNotifyGive(HeartbeatAnimeTaskHandle);
+        while (udp.available())
+        {
+            uint8_t tmp = udp.read();
+            if (tmp < 0x80) // Command packet
+            {
+                if (tmp != RxRemote)
+                {
+                    if (tmp < 0x40) CAN_tx_frame.MsgID = Cradle_ID; // MR => AR
+                    else CAN_tx_frame.MsgID = MR_ID; // AR => MR
+                    CAN_tx_frame.FIR.B.DLC = 2;
+                    CAN_tx_frame.data.u8[0] = 0xFF;
+                    CAN_tx_frame.data.u8[1] = tmp;
+                    ESP32Can.CANWriteFrame(&CAN_tx_frame);
+                    Log("Got 0x%X from peer", tmp);
+                    RxRemote = tmp;
+                }
+                udp.beginPacket(UDP_ADDRESS, UDP_PORT);
+                udp.write(tmp + 0x80);
+                udp.endPacket();
+            }
+            else if (tmp != 0xFF) // ACK packet
+            {
+                Log("Sent 0x%X to peer", tmp - 0x80);
+                if (tmp - 0x80 == TxRemote) TxRemote = 0x00; // If ACK received, stop sending
+            }
+            //udp.flush(); // Necessary if not read the remaining data
+            //break;
+        }
+    }
 }
 
 void Log(const char * format, ...) // Customized printf based logging function

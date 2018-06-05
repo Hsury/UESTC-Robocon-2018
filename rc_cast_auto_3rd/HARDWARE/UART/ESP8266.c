@@ -49,25 +49,17 @@ void ESP8266_Init(uint32_t Baudrate)
 
 void UART4_IRQHandler(void)
 {
+    BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
     uint8_t tmp;
     if (USART_GetITStatus(UART4, USART_IT_RXNE) != RESET) //接收中断
     {
         tmp = USART_ReceiveData(UART4); //(UART4->DR);
-        if (tmp == 0x11 || tmp == 0x12 || tmp == 0x21)
-        {
-            Cradle_RetryNotify(tmp);
-            Printf(ESP8266, "%c", 0xAC);
-        }
+        //xTaskNotifyFromISR(WirelessTask_Handler, tmp, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
         RingBuf_Overwrite(&ESP8266_RingBuf, &tmp);
         Checkout(&ESP8266_RingBuf);
         char AT_Response[4];
         for (uint8_t i = 0; i < 4; i++) RingBuf_Peek(&ESP8266_RingBuf, 4 + i, (uint8_t*)(&AT_Response[i]));
-        if (!strncmp(AT_Response, "OK\r\n", 4))
-        {
-            BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
-            xSemaphoreGiveFromISR(ATOKSemaphore, &pxHigherPriorityTaskWoken);
-            if (pxHigherPriorityTaskWoken != pdFALSE) taskYIELD();
-        }
+        if (!strncmp(AT_Response, "OK\r\n", 4)) xSemaphoreGiveFromISR(ATOKSemaphore, &pxHigherPriorityTaskWoken);
     }
     else
     {
@@ -78,6 +70,7 @@ void UART4_IRQHandler(void)
         }
         USART_ClearFlag(UART4, USART_IT_RXNE);
     }
+    if (pxHigherPriorityTaskWoken != pdFALSE) taskYIELD();
 }
 
 void ESP8266_ExitTransLink()

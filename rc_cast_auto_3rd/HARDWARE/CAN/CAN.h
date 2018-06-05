@@ -18,6 +18,9 @@
 
 #define CRADLE_CAN_ID               0x72
 
+#define START_DASH_CAN_ID           0x73
+#define EXIT_DASH_CAN_ID            0x74
+
 #define PROBE_ONLINE_CAN_ID         0xA0
 #define PROBE_USER_CAN_ID           0xA1
 #define PROBE_TIMER_CAN_ID          0xA2

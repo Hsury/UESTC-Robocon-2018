@@ -134,7 +134,7 @@ void CAN2_RX0_IRQHandler()
             memcpy(&STmp, &RxMessage.Data[0], 4);
             PosXTmp = Encoder2RealX(STmp);
             RealVelXTmp = (PosXTmp - PosX) / DeltaTS * 1000;
-            if (fabs(PosXTmp) > 8 || fabs(RealVelXTmp) > 10)
+            if (fabs(PosXTmp) > 8 || fabs(PosXTmp - PosX) > 1)
             {
                 GyroEncoder_SetFlag(false);
                 break;
@@ -145,7 +145,7 @@ void CAN2_RX0_IRQHandler()
             memcpy(&STmp, &RxMessage.Data[4], 4);
             PosYTmp = Encoder2RealY(STmp);
             RealVelYTmp = (PosYTmp - PosY) / DeltaTS * 1000;
-            if (fabs(PosYTmp) > 8 || fabs(RealVelYTmp) > 10)
+            if (fabs(PosYTmp) > 8 || fabs(PosYTmp - PosY) > 1)
             {
                 GyroEncoder_SetFlag(false);
                 break;
@@ -167,7 +167,7 @@ void CAN2_RX0_IRQHandler()
             memcpy(&FTmp, &RxMessage.Data[0], 4);
             PosZTmp = Gyro2RealZ(FTmp);
             RealVelZTmp = (DeltaAng(PosZTmp - PosZ)) / DeltaTS * 1000;
-            if (FTmp < -180 || FTmp > 180 || fabs(RealVelZTmp) > 180)
+            if (FTmp < -180 || FTmp > 180 || fabs(PosZTmp - PosZ) > 90)
             {
                 GyroEncoder_SetFlag(false);
                 break;
@@ -197,12 +197,16 @@ void CAN2_RX0_IRQHandler()
         switch (RxMessage.Data[0])
         {
             case 0x08: // 初始化
-			xTaskNotifyFromISR(FlowTask_Handler, GET_READY, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            xTaskNotifyFromISR(FlowTask_Handler, GET_READY, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
             break;
             
             case 0x06: // 开启吸盘
-            Move_Init();
+            GoalX = PosX;
+            GoalY = PosY;
+            GoalZ = PosZ;
             Pin();
+            Cradle_AdjustNotify();
+            //Move_Init();
             //xTaskNotifyFromISR(MoveTask_Handler, LOCKPOINT, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
             break;
             
@@ -211,7 +215,8 @@ void CAN2_RX0_IRQHandler()
             break;
             
             case 0x02: // 发车
-			xTaskNotifyFromISR(FlowTask_Handler, LAUNCH, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+            Cradle_RestartNotify(TZ1);
+            xTaskNotifyFromISR(FlowTask_Handler, LAUNCH, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
             break;
             
             case 0x01: // 重试
@@ -242,10 +247,23 @@ void CAN2_RX0_IRQHandler()
         {
             xTaskNotifyFromISR(FlowTask_Handler, MOVE_ON, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
         }
-        else if (RxMessage.Data[0] == 0xEE && RxMessage.Data[1] == 0x01)
+        else if (RxMessage.Data[0] == 0xEE)
         {
-            vTaskNotifyGiveFromISR(WirelessTask_Handler, &pxHigherPriorityTaskWoken);
+            xTaskNotifyFromISR(WirelessTask_Handler, RxMessage.Data[1], eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
         }
+        break;
+        
+        case START_DASH_CAN_ID:;
+        int32_t IncX, IncY;
+        memcpy(&IncX, &RxMessage.Data[0], 4);
+        memcpy(&IncY, &RxMessage.Data[4], 4);
+        Move_EnterDash(IncX / 1000.0f, IncY / 1000.0f);
+        xTaskNotifyFromISR(MoveTask_Handler, DASH, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
+        break;
+        
+        case EXIT_DASH_CAN_ID:
+        Move_ExitDash();
+        xTaskNotifyFromISR(MoveTask_Handler, LOCKPOINT, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
         break;
         
         case PROBE_ONLINE_CAN_ID:

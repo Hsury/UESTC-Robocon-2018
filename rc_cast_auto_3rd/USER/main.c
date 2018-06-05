@@ -13,7 +13,7 @@
                     ===== UESTC Cast Auto Robot 3rd For ABU Robocon 2018 =====
                               Copyright (c) 2018 HsuRY <i@hsury.com>
 
-                                        VERSION 2018/05/17
+                                        VERSION 2018/06/02
 
 */
 
@@ -31,7 +31,7 @@ void InitTask(void *pvParameters)
     xTaskCreate(ReportTask, "Report Task", 256, NULL, 3, &ReportTask_Handler);
     xTaskCreate(WirelessTask, "Wireless Task", 256, NULL, 4, &WirelessTask_Handler);
     xTaskCreate(MoveTask, "Move Task", 512, NULL, 5, &MoveTask_Handler);
-	xTaskCreate(FlowTask, "Flow Task", 256, NULL, 6, &FlowTask_Handler);
+    xTaskCreate(FlowTask, "Flow Task", 256, NULL, 6, &FlowTask_Handler);
     taskEXIT_CRITICAL();
     
     printf("System started!\r\n");
@@ -42,13 +42,13 @@ void InitTask(void *pvParameters)
     //ESP8266配置区
     //ESP8266_ExitTransLink();
     //ESP8266_UARTConfig(921600);
-    //ESP8266_WiFiModeConfig(SOFTAP_STATION);
-    //ESP8266_StationConfig("Robocon-WiFi", "***REMOVED***");
+    //ESP8266_WiFiModeConfig(STATION);
+    //ESP8266_StationConfig("UESTC-Robocon-WiFi", "duoguanyuenan8");
     //ESP8266_StationDHCPConfig(true);
-    //ESP8266_StationIPConfig("192.168.1.200", "192.168.1.1", "255.255.255.0");
-    //ESP8266_SoftAPConfig("HsuRY's STM32F407", "***REMOVED***", 5, WPA2_PSK, 2, false);
+    //ESP8266_StationIPConfig("192.168.1.61", "192.168.1.1", "255.255.255.0");
+    //ESP8266_SoftAPConfig("HsuRY's STM32F407", "HSURY.COM", 5, WPA2_PSK, 2, false);
     //ESP8266_UDPTransLinkConfig("192.168.1.255", 2018, 2018);
-    //ESP8266_TCPTransLinkConfig("192.168.1.233", 3018);
+    //ESP8266_TCPTransLinkConfig("192.168.1.233", 2333);
     //ESP8266_Reset();
     
     vTaskDelete(NULL);
@@ -67,7 +67,7 @@ int main(void)
     Buzzer_Init();
     RGBLED_Init();
     Cylinder_Init();
-	Sensor_Init();
+    Sensor_Init();
     Elmo_Init(CAN1, 9, 0);
     Elmo_Close(0);
     xTaskCreate(InitTask, "Init Task", 128, NULL, 1, &InitTask_Handler);

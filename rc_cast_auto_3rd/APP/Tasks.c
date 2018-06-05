@@ -55,21 +55,27 @@ void ReportTask(void *pvParameters)
         PackUp(0xA8, (uint8_t*)(&PosY));
         PackUp(0xA9, (uint8_t*)(&PosZ));
         #endif
-        delay_ms(500);
+        delay_ms(50);
     }
 }
 
 void WirelessTask(void *pvParameters)
 {
+    //uint8_t TxData = 0x00;
     while (1)
     {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        //if (AirUART_Send_And_Wait(&Zone, 1, 5)) xTaskNotifyGive(BeepTask_Handler); //433MHz 透传模块
-        for (uint8_t i = 0; i < 10; i++)
+        uint8_t tmp = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(25));
+        /*
+        if (tmp && tmp < 0x40) //MR => AR
         {
-            Printf(ESP8266, "%c", 0xA0);
-            delay_ms(5);
+            if (tmp == 0x11 || tmp == 0x12 || tmp == 0x21) Cradle_RetryNotify(tmp);
+            Printf(ESP8266, "%c", tmp + 0x80);
         }
+        else if (tmp && tmp < 0x80) TxData = tmp; //AR => MR
+        else if (tmp > 0x80 && tmp - 0x80 == TxData) TxData = 0x00; //收到当前在发数据的确认响应
+        if (TxData) Printf(ESP8266, "%c", TxData);
+        //if (AirUART_Send_And_Wait(&Zone, 1, 5)) xTaskNotifyGive(BeepTask_Handler); //433MHz 透传模块
+        */
     }
 }
 
@@ -82,31 +88,33 @@ void MoveTask(void *pvParameters)
     {
         uint32_t StartTS = millis();
         uint32_t PauseDuration = 0;
+        bool Relocated = false;
         bool Arrived = false;
+        bool Virgin = true;
         GEErrorTS = StartTS;
-        Move_PID_Start();
+        Printf(ESP8266, "Path %u was loaded\r\n", Path);
         switch (Path)
         {
-            case LOCKPOINT: GoalX = PosX; GoalY = PosY; GoalZ = PosZ; goto LockPoint;
             case SZ_TZ1: PathParam = &PathParam_SZ_TZ1; break;
             case TZ1_TZ2: PathParam = &PathParam_TZ1_TZ2; break;
             case TZ2_TZ3: PathParam = &PathParam_TZ2_TZ3; break;
             case SZ_TZ2: PathParam = &PathParam_SZ_TZ2; break;
             case SZ_TZ3: PathParam = &PathParam_SZ_TZ3; break;
-            case TZ1_SZ: PathParam = &PathParam_TZ1_SZ; break;
-            case TZ2_SZ: PathParam = &PathParam_TZ2_SZ; break;
             case TZ3_SZ: PathParam = &PathParam_TZ3_SZ; break;
+            case LOCKPOINT: Move_PID_SetTunings(&PathParam_LockPoint); Move_PID_SetLimits(&PathParam_LockPoint); goto LockPoint;
+            case DASH: Move_PID_SetTunings(&PathParam_Dash); Move_PID_SetLimits(&PathParam_Dash); goto LockPoint;
             default: Path = ulTaskNotifyTake(pdTRUE, portMAX_DELAY); continue;
         }
-        while (DeltaPos(PosX - PathParam->P0[0], PosY - PathParam->P0[1]) > 0.50 || fabs(PosZ - PathParam->P0[2]) > 30) //路径启动位置保护
+        while (fabs(PosX - PathParam->P0[0]) > 0.25 || fabs(PosY - PathParam->P0[1]) > 0.25 || fabs(PosZ - PathParam->P0[2]) > 30.00) //路径启动位置保护
         {
             Buzzer_On(); delay_ms(500); Buzzer_Off(); delay_ms(500);
             Buzzer_On(); delay_ms(250); Buzzer_Off(); delay_ms(750);
         }
         Move_PID_SetTunings(PathParam);
         Move_PID_SetLimits(PathParam);
-        while (millis() - StartTS - PauseDuration <= PathParam->Duration)
+        while (millis() - StartTS - PauseDuration <= PathParam->Duration || fabs(GoalX - PosX) > 0.25 || fabs(GoalY - PosY) > 0.25 || fabs(GoalZ - PosZ) > 5.00)
         {
+            if (!Relocated && millis() - StartTS - PauseDuration > PathParam->Duration * 0.9 && fabs(GoalX - PosX) <= 0.50 && fabs(GoalY - PosY) <= 0.50) Relocated = Move_Relocate(); //描点过程中尝试重定位
             if (xSemaphoreTake(PauseSemaphore, 0)) //底盘运动暂停
             {
                 uint32_t PauseTS = millis();
@@ -128,35 +136,53 @@ void MoveTask(void *pvParameters)
             Move_PID_Compute();
             Move_PID_Apply();
             //Move_AddConstantFiducial(1);
-            //Move_AddDerivativeFiducial(PathParam, millis() - StartTS, 0.25, 0.2, 0.8);
+            //Move_AddDerivativeFiducial(PathParam, millis() - StartTS - PauseDuration, 0.25, 0.2, 0.8);
             Omni_Elmo_PVM();
-            //Printf(ESP8266, "T = %u, Err = (%.3f, %.3f, %.3f), Vel = (%.3f, %.3f, %.3f)\r\n", millis() - StartTS, PosX - GoalX, PosY - GoalY, PosZ - GoalZ, VelX, VelY, VelZ);
+            Printf(ESP8266, "%ums, P(%.2f, %.2f, %.2f), G(%.2f, %.2f, %.2f), E(%.2f, %.2f, %.2f), GV(%.2f, %.2f, %.2f), RV(%.2f, %.2f, %.2f)\r\n", millis() - StartTS, PosX, PosY, PosZ, GoalX, GoalY, GoalZ, PosX - GoalX, PosY - GoalY, PosZ - GoalZ, VelX, VelY, VelZ, RealVelX, RealVelY, RealVelZ);
             delay_ms(5);
         }
-        if (!Move_Relocate()) Buzzer_On(); //尝试重定位，不成功则拉高蜂鸣器
-        LockPoint:
-        //Printf(ESP8266, "Enter Lock Point Mode\r\n");
+        Relocated = Move_Relocate(); //描点结束后再次尝试重定位，不成功则拉高蜂鸣器
+        if (!Relocated) Buzzer_On();
         Move_PID_SetTunings(&PathParam_LockPoint);
         Move_PID_SetLimits(&PathParam_LockPoint);
+        LockPoint:
+        Printf(ESP8266, "Switched to Lock-Point mode\r\n");
         do
         {
-            if (!Arrived && DeltaPos(GoalX - PosX, GoalY - PosY) <= 0.05 && fabs(GoalZ - PosZ) <= 0.5 && DeltaPos(RealVelX, RealVelY) <= 0.50)
+            if (Virgin && Path != LOCKPOINT && Path != DASH && !Relocated) Relocated = Move_Relocate(); //若该段路径在锁点部分未重定位成功，则持续重试
+            if (Virgin && fabs(RealVelX) <= 0.20f && fabs(RealVelY) <= 0.20f && fabs(RealVelZ) <= 20.00f && ((fabs(GoalX - PosX) <= 0.03 && fabs(GoalY - PosY) <= 0.03 && (Path == DASH || fabs(GoalZ - PosZ) <= 0.5)) || (Path != LOCKPOINT && Path != DASH && millis() - StartTS - PauseDuration > PathParam->Timeout)))
             {
-                if (Path != LOCKPOINT && PIN_WHEN_ARRIVE)
-                {
-                    Omni_Elmo_Stop();
-                    Pin();
-                }
-                //delay_ms(500);
-                Move_UpdateZone();
-                xSemaphoreGive(ArrivedSemaphore);
-                Cradle_ArriveNotify(Zone);
-                Probe_SetTimer(Zone - 1, millis() - StartTS);
-                //Printf(ESP8266, "Arrived\r\n");
-                xTaskNotifyGive(BeepTask_Handler);
+                Buzzer_On();
+                Omni_Elmo_Stop();
+                if (PIN_WHEN_ARRIVE) Pin();
                 Arrived = true;
+                Probe_SetTimer(Path - 1, millis() - StartTS - PauseDuration);
+                //if (Path == TZ1_TZ2 || Path == TZ2_TZ3) delay_ms(200);
+                Move_UpdateZone();
+                if (Path != LOCKPOINT && Path != DASH)
+                {
+                    Cradle_ArriveNotify(Zone);
+                    xSemaphoreGive(ArrivedSemaphore);
+                }
+                else if (Path == LOCKPOINT) Cradle_AdjustNotify();
+                Virgin = false;
+                Buzzer_Off();
+                Printf(ESP8266, "First-Blood was taken at %ums\r\n", millis() - StartTS);
             }
-            if (Path == LOCKPOINT || !PIN_WHEN_ARRIVE || !Arrived)
+            if (!Arrived && Path != DASH && fabs(GoalX - PosX) <= 0.03 && fabs(GoalY - PosY) <= 0.03 && fabs(GoalZ - PosZ) <= 0.5) //进入到达误差容许范围
+            {
+                Omni_Elmo_Stop();
+                if (PIN_WHEN_ARRIVE) Pin();
+                Arrived = true;
+                Printf(ESP8266, "Lock-Point stopped at %ums\r\n", millis() - StartTS);
+            }
+            else if (ADJUST_AFTER_PIN && Arrived && Path != DASH && (fabs(GoalX - PosX) > 0.05 || fabs(GoalY - PosY) > 0.05 || fabs(GoalZ - PosZ) > 0.8)) //超出校准误差容许范围
+            {
+                if (PIN_WHEN_ARRIVE) Unpin();
+                Arrived = false;
+                Printf(ESP8266, "Lock-Point started at %ums\r\n", millis() - StartTS);
+            }
+            if (!Arrived) //执行锁点
             {
                 if (!GyroEncoder_ReadFlag()) //陀螺仪与码盘数据不可用
                 {
@@ -169,16 +195,16 @@ void MoveTask(void *pvParameters)
                 Move_PID_Apply();
                 //Move_DeadzoneCtrl(0.01, 0.1);
                 Omni_Elmo_PVM();
+                Printf(ESP8266, "%ums, P(%.2f, %.2f, %.2f), G(%.2f, %.2f, %.2f), E(%.2f, %.2f, %.2f), GV(%.2f, %.2f, %.2f), RV(%.2f, %.2f, %.2f)\r\n", millis() - StartTS, PosX, PosY, PosZ, GoalX, GoalY, GoalZ, PosX - GoalX, PosY - GoalY, PosZ - GoalZ, VelX, VelY, VelZ, RealVelX, RealVelY, RealVelZ);
             }
             NewPath = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(5));
-            //Printf(ESP8266, "T = %u, Goal = (%.3f, %.3f, %.3f), Err = (%.3f, %.3f, %.3f), Vel = (%.3f, %.3f, %.3f)\r\n", millis() - StartTS, GoalX, GoalY, GoalZ, PosX - GoalX, PosY - GoalY, PosZ - GoalZ, VelX, VelY, VelZ);
         }
         while (!NewPath);
         Path = NewPath;
-        Move_PID_Stop();
-        if (Path != LOCKPOINT && PIN_WHEN_ARRIVE) Unpin();
-        //xTaskNotifyGive(BeepTask_Handler);
-        for (uint8_t i = 0; i < 3; i++) {Buzzer_On(); delay_ms(250); Buzzer_Off(); delay_ms(750);}
+        Omni_Elmo_Stop();
+        if (PIN_WHEN_ARRIVE) Unpin();
+        xTaskNotifyGive(BeepTask_Handler);
+        //for (uint8_t i = 0; i < 3; i++) {Buzzer_On(); delay_ms(250); Buzzer_Off(); delay_ms(750);}
     }
 }
 
@@ -190,8 +216,12 @@ void FlowTask(void *pvParameters)
     while (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) != GET_READY);                // 等待[预备]指令
     
     xTaskNotifyGive(BeepTask_Handler);                                           // 蜂鸣器叫一下
+    Elmo_Reinit(0);                                                              // 底盘抱死
+    Pin();                                                                       // 吸盘吸地
     Cradle_ReturnNotify();                                                       // 通知二维平台初始化
-    delay_ms(100);                                                               // 按键消抖
+    delay_ms(1000);                                                              // 等待二维平台复位
+    Unpin();                                                                     // 吸盘释放
+    Elmo_Close(0);                                                               // 底盘释放
     ulTaskNotifyTake(pdTRUE, 0);                                                 // 清除残余的任务通知    
     
     while (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(2000)) != GET_READY)           // 等待第二次[预备]指令
@@ -202,14 +232,15 @@ void FlowTask(void *pvParameters)
     xTaskNotifyGive(BeepTask_Handler);                                           // 蜂鸣器叫一下
     Move_Init();                                                                 // 底盘电机抱死
     GyroEncoder_Off();                                                           // 暂停接收陀螺仪与码盘的数据
-    delay_ms(10);                                                                // 等待0.01s，确保再次进入中断时不会覆盖已设置的坐标
+    delay_ms(5);                                                                 // 等待5ms，确保再次进入中断时不会覆盖已设置的坐标
     PosX = PathParam_SZ_TZ1.P0[0];                                               // 将启动区的位置设置为当前位置，并更新到陀螺仪与码盘
     PosY = PathParam_SZ_TZ1.P0[1];                                               // 将启动区的位置设置为当前位置，并更新到陀螺仪与码盘
     PosZ = PathParam_SZ_TZ1.P0[2];                                               // 将启动区的位置设置为当前位置，并更新到陀螺仪与码盘
     GyroEncoder_SetPos();                                                        // 更新码盘的坐标信息
     GyroEncoder_SetAng();                                                        // 更新陀螺仪的坐标信息
+    delay_ms(5);                                                                 // 等待5ms，确保设置的坐标已经在陀螺仪与码盘上生效
     GyroEncoder_On();                                                            // 继续接收陀螺仪与码盘的数据
-    delay_ms(100);                                                               // 按键消抖
+    delay_ms(200);                                                               // 按键消抖
     ulTaskNotifyTake(pdTRUE, 0);                                                 // 清除残余的任务通知
     
     while (1)
@@ -227,6 +258,7 @@ void FlowTask(void *pvParameters)
             PosZ = PathParam_SZ_TZ1.P0[2];                                       // 将启动区的位置设置为当前位置，并更新到陀螺仪与码盘
             GyroEncoder_SetPos();                                                // 更新码盘的坐标信息
             GyroEncoder_SetAng();                                                // 更新陀螺仪的坐标信息
+            delay_ms(10);                                                        // 等待10ms，确保设置的坐标已经在陀螺仪与码盘上生效
             GyroEncoder_On();                                                    // 继续接收陀螺仪与码盘的数据
             ulTaskNotifyTake(pdTRUE, 0);                                         // 清除残余的任务通知
             break;
@@ -239,36 +271,41 @@ void FlowTask(void *pvParameters)
     
     Setout:
     xTaskNotifyGive(BeepTask_Handler);                                           // 蜂鸣器叫一下
-    delay_ms(1000);
-    if (!Retry)                                                                  // 如果处于重试状态，在这里进行路径分支选择
+    switch (Retry)                                                               // 如果处于重试状态，在这里进行路径分支选择
     {
+        case 0:                                                                  // >正常发车
         xTaskNotify(MoveTask_Handler, SZ_TZ1, eSetValueWithOverwrite);           // 底盘开始跑SZ->TZ1的路径
         xSemaphoreTake(ArrivedSemaphore, 0);                                     // 清除残余的底盘到达信号量
         xSemaphoreTake(ArrivedSemaphore, portMAX_DELAY);                         // 等待底盘到达信号量被释放
-        Zone = TZ1;                                                              // 将区域变量设置为TZ1
         ulTaskNotifyTake(pdTRUE, 0);                                             // 清除残余的任务通知
         while (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) != MOVE_ON);              // 等待[继续]指令
-        
         xTaskNotify(MoveTask_Handler, TZ1_TZ2, eSetValueWithOverwrite);          // 底盘开始跑TZ1->TZ2的路径
         xSemaphoreTake(ArrivedSemaphore, 0);                                     // 清除残余的底盘到达信号量
         xSemaphoreTake(ArrivedSemaphore, portMAX_DELAY);                         // 等待底盘到达信号量被释放
-        Zone = TZ2;                                                              // 将区域变量设置为TZ2
         ulTaskNotifyTake(pdTRUE, 0);                                             // 清除残余的任务通知
         while (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) != MOVE_ON);              // 等待[继续]指令
-    }
-    else
-    {
+        xTaskNotify(MoveTask_Handler, TZ2_TZ3, eSetValueWithOverwrite);          // 底盘开始跑TZ2->TZ3的路径
+        xSemaphoreTake(ArrivedSemaphore, 0);                                     // 清除残余的底盘到达信号量
+        xSemaphoreTake(ArrivedSemaphore, portMAX_DELAY);                         // 等待底盘到达信号量被释放
+        break;
+        
+        case 1:                                                                  // >重试TZ2
         xTaskNotify(MoveTask_Handler, SZ_TZ2, eSetValueWithOverwrite);           // 底盘开始跑SZ->TZ2的路径
         xSemaphoreTake(ArrivedSemaphore, 0);                                     // 清除残余的底盘到达信号量
         xSemaphoreTake(ArrivedSemaphore, portMAX_DELAY);                         // 等待底盘到达信号量被释放
-        Zone = TZ2;                                                              // 将区域变量设置为TZ2
         ulTaskNotifyTake(pdTRUE, 0);                                             // 清除残余的任务通知
         while (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) != MOVE_ON);              // 等待[继续]指令
+        xTaskNotify(MoveTask_Handler, TZ2_TZ3, eSetValueWithOverwrite);          // 底盘开始跑TZ2->TZ3的路径
+        xSemaphoreTake(ArrivedSemaphore, 0);                                     // 清除残余的底盘到达信号量
+        xSemaphoreTake(ArrivedSemaphore, portMAX_DELAY);                         // 等待底盘到达信号量被释放
+        break;
+        
+        case 2:                                                                  // >重试TZ3
+        xTaskNotify(MoveTask_Handler, SZ_TZ3, eSetValueWithOverwrite);           // 底盘开始跑SZ->TZ3的路径
+        xSemaphoreTake(ArrivedSemaphore, 0);                                     // 清除残余的底盘到达信号量
+        xSemaphoreTake(ArrivedSemaphore, portMAX_DELAY);                         // 等待底盘到达信号量被释放
+        break;
     }
-    xTaskNotify(MoveTask_Handler, TZ2_TZ3, eSetValueWithOverwrite);              // 底盘开始跑TZ2->TZ3的路径
-    xSemaphoreTake(ArrivedSemaphore, 0);                                         // 清除残余的底盘到达信号量
-    xSemaphoreTake(ArrivedSemaphore, portMAX_DELAY);                             // 等待底盘到达信号量被释放
-    Zone = TZ3;                                                                  // 将区域变量设置为TZ3
     ulTaskNotifyTake(pdTRUE, 0);                                                 // 清除残余的任务通知
     while (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) != LAUNCH);                   // 等待[回归(发车)]指令
     
@@ -276,5 +313,6 @@ void FlowTask(void *pvParameters)
     xSemaphoreTake(ArrivedSemaphore, 0);                                         // 清除残余的底盘到达信号量
     xSemaphoreTake(ArrivedSemaphore, portMAX_DELAY);                             // 等待底盘到达信号量被释放
     
+    NVIC_SystemReset();                                                          // 复位主控
     vTaskDelete(NULL);
 }

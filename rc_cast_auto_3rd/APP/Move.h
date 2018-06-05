@@ -3,7 +3,9 @@
 
 #include "includes.h"
 
+#define USE_DT35 1
 #define PIN_WHEN_ARRIVE 1
+#define ADJUST_AFTER_PIN 1
 
 enum ZONE
 {
@@ -16,15 +18,14 @@ enum ZONE
 
 enum PATH
 {
-    LOCKPOINT = 0, 
     SZ_TZ1 = 1, 
     TZ1_TZ2 = 2, 
     TZ2_TZ3 = 3, 
     SZ_TZ2 = 4, 
     SZ_TZ3 = 5, 
-    TZ1_SZ = 6, 
-    TZ2_SZ = 7, 
-    TZ3_SZ = 8
+    TZ3_SZ = 6, 
+    LOCKPOINT = 7, 
+    DASH = 8
 };
 
 typedef struct
@@ -38,6 +39,7 @@ typedef struct
     float Kd[3];
     float Limit[3];
     uint32_t Duration;
+    uint32_t Timeout;
 }
 PathParam_t;
 
@@ -47,9 +49,8 @@ extern PathParam_t PathParam_TZ1_TZ2;
 extern PathParam_t PathParam_TZ2_TZ3;
 extern PathParam_t PathParam_SZ_TZ2;
 extern PathParam_t PathParam_SZ_TZ3;
-extern PathParam_t PathParam_TZ1_SZ;
-extern PathParam_t PathParam_TZ2_SZ;
 extern PathParam_t PathParam_TZ3_SZ;
+extern PathParam_t PathParam_Dash;
 
 extern PID_t PIDX;
 extern PID_t PIDY;
@@ -66,8 +67,8 @@ void Move_SetGoal(PathParam_t* PathParamStruct, uint32_t TimePassed);
 void Move_AddConstantFiducial(float ResVel);
 void Move_AddDerivativeFiducial(PathParam_t* PathParamStruct, uint32_t TimePassed, float MaxCoef, float TP1, float TP2);
 void Move_DeadzoneCtrl(float XY, float Z);
-void Move_PID_Start(void);
-void Move_PID_Stop(void);
+void Move_EnterDash(float IncX, float IncY);
+void Move_ExitDash(void);
 void Move_PID_Compute(void);
 void Move_PID_Apply(void);
 void Move_PID_SetTunings(PathParam_t* PathParamStruct);

@@ -38,6 +38,9 @@ uint8_t Checkout(RingBuf_t* Q)
                 break;
                 
                 case 0x00000003: // 底盘锁当前点
+                GoalX = PosX;
+                GoalY = PosY;
+                GoalZ = PosZ;
                 xTaskNotifyFromISR(MoveTask_Handler, LOCKPOINT, eSetValueWithOverwrite, &pxHigherPriorityTaskWoken);
                 break;
                 
